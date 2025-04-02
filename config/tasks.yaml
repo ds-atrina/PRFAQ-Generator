@@ -1,0 +1,94 @@
+extract_info_task:
+  description: >
+    Carefully extract key information from the provided reference document ```{reference_doc_content}```. 
+    Focus on retrieving details like Problem Statement, Solution, Objectives, Target Customers, Key Features, Limitations, Benefits, and Market Context. 
+    Return empty if no relevant content is found, **DO NOT USE INFORMATION FROM OTHER TASKS. DO NOT MAKE UP INFORMATION.**
+  expected_output: >
+    A structured JSON object containing the extracted information ready for PR FAQ generation.
+  agent: extract_info_agent
+
+web_scrape_extraction_task:
+  description: >
+    Visit and scrape content from the given web page whose URL is provided in triple quotes ```{web_scraping_link}``` using the Web Scraping Tool. SKIP TASK AND DO NOT USE THE TOOL if no URL is provided.
+    After scraping, extract all relevant information that relates to 1 Finance's new offering—this could include details about the product, its past versions, competitor insights among other possibilities. 
+    Only extract content that is present on the page; do not invent any details. **DO NOT USE INFORMATION FROM OTHER TASKS. DO NOT MAKE UP INFORMATION.**
+  expected_output: >
+    A structured JSON object containing all relevant extracted content from the web page, else empty if no link provided or web page could not be scraped.
+  agent: web_scrape_extractor
+
+content_generation_task:
+  description: >
+    Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt.
+    Follow the exact JSON template below, using placeholders for any specific dates, names, or locations:
+    {{
+      "Title": "1 FINANCE ANNOUNCES THE LAUNCH OF XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
+      "Subtitle": "[The subtitle reframes the headline solution. Write one sentence about the benefits.]",
+      "IntroParagraph": "[Location] - [Launch Date] - [2-4 sentences summarizing the product and benefits in a self-contained paragraph.]",
+      "CustomerProblems": "[2-4 sentences describing the customer problems this product solves, from the customer's perspective.]",
+      "Solution": "[2-4 sentences describing how the product addresses these problems. For complex products, multiple paragraphs may be needed.]",
+      "LeadersQuote": "[A single quote from a leader explaining why the product was developed and how it solves key issues. Use single quotes for quoting.]",
+      "CustomerQuotes": "[A list of genuine-sounding quotes from customers describing their pain points and how the product helps, using single quotes.]",
+      "GettingStarted": "[1-3 sentences on how a customer can start using the product, with enough detail to instill confidence.]"
+    }}
+  expected_output: >
+    A JSON object strictly following the provided template with all required sections using information from reference document and scraped web page.
+  agent: content_generation_agent
+  # context: [extract_info_task, content_generation_task]
+
+faq_generation_task:
+  description: >
+    Take a moment to think about all possible questions that can be asked about this offering or topic.
+    Based on the generated PR FAQ introduction, create a comprehensive FAQ document divided into two categories:
+      1. Internal FAQs: At least 15-20 questions focusing on business rationale, product vision, internal processes, strategy, and roadmap.
+      2. External FAQs: At least 15-20 questions focusing on customer usage, benefits, pricing, support, limitations, onboarding, and competitive advantage.
+    Combine the generated introduction with the FAQs into a single, properly formatted JSON object.  
+    Use the knowledge base tool to answer any question regarding the company, its past products, similar products, its policies and so on, else use the generated content to answer them.
+    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance where applicable, and clearly marked sub-points or bullet points for clarity. 
+    ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE IF REQUIRED, ELSE GENERATED CONTENT.
+  expected_output: >
+    A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using bullets or italics wherever necessary. Do not give simple one sentence answers.
+  agent: faq_generation_agent
+  # context: [content_generation_task]
+
+# extract_info_task:
+#   description: >
+#     Carefully extract key information from the provided document ```{reference_doc_content}```, if no content then return empty, that will help in the creation of comprehensive internal and external FAQs. No need for deep crawl.
+#     The extraction should include clear sections such as: Problem Statement, Solution, Objective, Target Customers, Key Features, Limitations, Benefits, and any other important points or highlights.
+#   expected_output: >
+#     A well-structured and detailed set of extracted key information from the provided document, if no content provided return empty, to be used for generating a PR FAQ document on the given topic.
+#   agent: extract_info_agent
+
+# web_scrape_extraction_task:
+#   description: >
+#     Visit and scrape content from the given web page whose url is given in triple quotes ```{web_scraping_link}``` using Web Scraping Tool. After scraping and extract as much information as possible. The website content may be cluttered and confusing, read the full content, think carefully as to cover all important points mentioned on the web page and then extract information.
+#     DO NOT MAKE UP CONTENT. ONLY EXTRACT FROM GIVEN SCRAPED CONTENT. SKIP IF NO LINK. DO NOT ADD ANY EXTRA CHARACTERS TO THE LINK, USE THE LINK WITHIN THE TRIPLE QUOTES AS IS!
+#   expected_output: >
+#     A comprehensive extraction of the website's content, highlighting vital information and insights. Include information only from the scraped content!
+#   agent: web_scrape_extractor
+
+# content_generation_task:
+#   description: >
+#     Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided {context} and the extracted key information from the reference document and web scraping content. Follow a clear structure in JSON format with sections like Title, MarketAndBenefit, Subtitle, IntroParagraph, CustomerProblems, Solution, LeadersQuote, GettingStarted, and CustomerQuotes. Ensure each section is rich in content and covers multiple perspectives where relevant.
+#   expected_output: >
+#     A comprehensive, structured PR FAQ introduction for the given topic, with multiple sections and detailed information.
+#   agent: content_generation_agent
+
+# faq_generation_task:
+#   description: >
+#     Based on the generated content, create a comprehensive and exhaustive list of FAQs split into two categories: 
+#     1. Internal FAQs: Focused on internal stakeholders (product teams, sales, support, leadership), addressing business rationale, roadmap, product decisions, internal processes, and potential challenges. 
+#     2. External FAQs: Customer-facing questions focused on product usage, benefits, pricing, support, limitations, and onboarding.
+
+#     Return the content generation tasks output and combine with at least 15-20 thoughtfully generated questions in each category (internal and external), with extremely detailed answers. Include examples, step-by-step guidance where applicable, and clearly marked sub-points or bullet points for clarity. 
+#     Ensure that the content generation output is properly combined with the FAQs, closing all previous values or lists, to generate proper, STRICT JSON output.
+#     ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE AND GENERATED CONTENT.
+#   expected_output: >
+#     [STRICT JSON] The content generation output followed by the FAQs containing two categories: internal and external FAQs, each with an exhaustive list of 15-20 questions and highly detailed, well-formatted answers in the same JSON (simple question and answer format, no subheadings, just format it in the answers).
+#   agent: faq_generation_agent
+
+# # feedback_task:
+# #   description: >
+# #     Improve the FAQ output based on the provided feedback. Add new relevant questions and answers if required, refine the clarity, depth, and tone of the responses, and ensure better separation between internal and external FAQs. Enhance detail, add practical examples, and ensure completeness and coverage of edge cases.
+# #   expected_output: >
+# #     An updated JSON object with improved and enriched questions and answers based on the provided feedback.
+# #   agent: feedback_agent

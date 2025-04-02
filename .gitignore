@@ -1,0 +1,4 @@
+.env
+prfaqvenv/
+vector_store/
+__pycache__/
