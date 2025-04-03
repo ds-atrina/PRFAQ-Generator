@@ -5,6 +5,6 @@ streamlit
 langchain
 langchain-openai
 langchain-community
-crewai[tools]
+crewai-tools
 pysqlite3-binary
 setuptools
