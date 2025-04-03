@@ -7,3 +7,4 @@ langchain-openai
 langchain-community
 crewai[tools]
 pysqlite3-binary
+setuptools
