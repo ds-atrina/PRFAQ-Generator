@@ -44,13 +44,13 @@ def display_output(output):
 
     st.subheader("Internal FAQs")
     for faq in output.get("InternalFAQs", []):
-        st.write(f"**Q: {faq['question']}**")
-        st.write(f"A: {faq['answer']}")
+        st.write(f"**Q: {faq.get('question', faq.get('Question', 'Unknown Question'))}**")   
+        st.write(f"A: {faq.get('answer', faq.get('Answer', 'No answer provided'))}")
 
     st.subheader("External FAQs")
     for faq in output.get("ExternalFAQs", []):
-        st.write(f"**Q: {faq['question']}**")
-        st.write(f"A: {faq['answer']}")
+        st.write(f"**Q: {faq.get('question', faq.get('Question', 'Unknown Question'))}**")
+        st.write(f"A: {faq.get('answer', faq.get('Answer', 'No answer provided'))}")
 
 def modify_faq(existing_faq, user_feedback):
     llm = ChatOpenAI(model="gpt-4o") 
@@ -103,7 +103,7 @@ def main():
         else:
             # Knowledge base initialization
             kb_path = 'vector_store/'
-            provided_kb_pdf = "1F_KB.pdf" # Put 1F_KB.pdf if new folder
+            provided_kb_pdf = "1F_KB.pdf" 
 
             knowledge_base = CompanyKnowledgeBase(kb_path)
             if provided_kb_pdf:
