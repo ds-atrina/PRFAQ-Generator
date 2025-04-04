@@ -47,13 +47,47 @@ faq_generation_task:
     THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance where applicable, and clearly marked sub-points or bullet points for clarity. 
     ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE IF REQUIRED, ELSE GENERATED CONTENT.
   expected_output: >
-    A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using bullets or italics wherever necessary. Do not give simple one sentence answers.
+    A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using bullets or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
+    {{
+      "Title": "Revolutionizing AI Assistants",
+      "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
+      "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
+      "CustomerProblems": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
+      "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+      "LeadersQuote": "\"This AI assistant is a game-changer. It's designed to empower businesses with intelligent automation and efficiency.\" - CEO, TechCorp",
+      "GettingStarted": "To get started, businesses can sign up for our platform, customize their AI assistant, and integrate it with their existing workflows.",
+      "CustomerQuotes": [
+          "\"This AI assistant saved us hours of work every day!\" - Jane Doe, Operations Manager",
+          "\"Incredible efficiency boost for our customer service team.\" - John Smith, Support Lead"
+      ],
+      "InternalFAQs": [
+          {{
+              "Question": "How does the AI assistant integrate with existing tools?",
+              "Answer": "It seamlessly integrates with platforms like \n-Slack \n-Microsoft Teams \n-CRM systems via APIs."
+          }},
+          {{
+              "Question": "What kind of training data is required?",
+              "Answer": "The AI assistant can be **fine-tuned** with company-specific data for enhanced performance."
+          }}
+      ],
+      "ExternalFAQs": [
+          {{
+              "Question": "Is the AI assistant secure?",
+              "Answer": "Yes, we use industry-standard encryption and compliance measures to ensure data security."
+          }},
+          {{
+              "Question": "Can the AI assistant handle multiple languages?",
+              "Answer": "Absolutely! It supports multiple languages and can be customized based on user needs."
+          }}
+      ]
+    }}
+
   agent: faq_generation_agent
   # context: [content_generation_task]
 
 # extract_info_task:
 #   description: >
-#     Carefully extract key information from the provided document ```{reference_doc_content}```, if no content then return empty, that will help in the creation of comprehensive internal and external FAQs. No need for deep crawl.
+#     Carefully extract key information from the provided document ```{{reference_doc_content}```, if no content then return empty, that will help in the creation of comprehensive internal and external FAQs. No need for deep crawl.
 #     The extraction should include clear sections such as: Problem Statement, Solution, Objective, Target Customers, Key Features, Limitations, Benefits, and any other important points or highlights.
 #   expected_output: >
 #     A well-structured and detailed set of extracted key information from the provided document, if no content provided return empty, to be used for generating a PR FAQ document on the given topic.
