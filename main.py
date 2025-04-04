@@ -140,7 +140,7 @@ def main():
             crew_output = pr_faq_crew.crew().kickoff(inputs=inputs)
 
             try:
-                parsed_output = json.loads(crew_output.raw)
+                parsed_output = json.loads(crew_output.raw.replace("```json","").replace("```","").strip())
                 st.session_state.pr_faq = parsed_output  # Store in session
                 display_output(parsed_output)
             except json.JSONDecodeError as e:
