@@ -138,13 +138,14 @@ def main():
             # Generate PR FAQ using Crew
             pr_faq_crew = PRFAQGeneratorCrew(inputs)
             crew_output = pr_faq_crew.crew().kickoff(inputs=inputs)
+            cleaned_json = crew_output.raw.replace("```json","").replace("```","").strip()
 
             try:
-                parsed_output = json.loads(crew_output.raw.replace("```json","").replace("```","").strip())
+                parsed_output = json.loads(cleaned_json)
                 st.session_state.pr_faq = parsed_output  # Store in session
                 display_output(parsed_output)
             except json.JSONDecodeError as e:
-                st.session_state.pr_faq = modify_faq(crew_output.raw, "Solve this in my JSON, I got this error: "+e)
+                st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: "+e)
                 # st.error(f"Error parsing JSON output: {e}")
 
     # Display and Modify Existing PR FAQ
