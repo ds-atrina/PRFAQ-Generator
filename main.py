@@ -6,6 +6,7 @@ import streamlit as st
 import os
 import sys
 import json
+import time
 import openai
 from utils import extract_text_from_pdf
 from knowledge_base import CompanyKnowledgeBase
@@ -48,13 +49,13 @@ def display_output(output):
 
     st.subheader("Internal FAQs")
     for faq in output.get("InternalFAQs", []):
-        st.write(f"**Q: {faq.get('question', faq.get('Question', 'Unknown Question'))}**")   
-        st.write(f"A: {faq.get('answer', faq.get('Answer', 'No answer provided'))}")
+        st.write(f"**Q: {faq.get('Question', faq.get('question', 'Unknown Question'))}**")   
+        st.write(f"A: {faq.get('Answer', faq.get('answer', 'No answer provided'))}")
 
     st.subheader("External FAQs")
     for faq in output.get("ExternalFAQs", []):
-        st.write(f"**Q: {faq.get('question', faq.get('Question', 'Unknown Question'))}**")
-        st.write(f"A: {faq.get('answer', faq.get('Answer', 'No answer provided'))}")
+        st.write(f"**Q: {faq.get('Question', faq.get('question', 'Unknown Question'))}**")
+        st.write(f"A: {faq.get('Answer', faq.get('answer', 'No answer provided'))}")
 
 def modify_faq(existing_faq, user_feedback):
     llm = ChatOpenAI(model="gpt-4o") 
@@ -100,12 +101,13 @@ def main():
     if st.button("Generate PR FAQ"):
         if not topic:
             st.error("Please provide a Topic.")
-        elif not problem:
-            st.error("Please provide a Problem.")
-        elif not solution:
-            st.error("Please provide a Solution.")
+        elif len(problem)<50:
+            st.error("Problem input is too short. Please enter at least 50 characters.")
+        elif len(solution)<50:
+            st.error("Solution input is too short. Please enter at least 50 characters.")
         else:
             # Knowledge base initialization
+            start_time = time.perf_counter()
             kb_path = 'vector_store/'
             provided_kb_pdf = "1F_KB.pdf" 
 
@@ -147,6 +149,9 @@ def main():
             except json.JSONDecodeError as e:
                 st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: "+e)
                 # st.error(f"Error parsing JSON output: {e}")
+            end_time = time.perf_counter()
+            execution_time = end_time - start_time
+            st.write(f"It took me {execution_time:.4f} seconds to generate this PR FAQ for you!")
 
     # Display and Modify Existing PR FAQ
     if st.session_state.pr_faq:

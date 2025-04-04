@@ -41,7 +41,8 @@ faq_generation_task:
     Based on the generated PR FAQ introduction, create a comprehensive FAQ document divided into two categories:
       1. Internal FAQs: At least 15-20 questions focusing on business rationale, product vision, internal processes, strategy, and roadmap.
       2. External FAQs: At least 15-20 questions focusing on customer usage, benefits, pricing, support, limitations, onboarding, and competitive advantage.
-    Combine the generated introduction with the FAQs into a single, properly formatted JSON object in Question and Answer format as keys.  
+
+    Combine the output of content_generation_task (whihc includes Title, Subtitle, IntroParagraph, CustomerProblems, Solution, LeadersQuote, CustomerQuotes, GettingStarted) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format) into a single, properly formatted JSON object.  
     Use the knowledge base tool to answer any question regarding the company, its past products, similar products, its policies and so on, else use the generated content to answer them.
     THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance where applicable, and clearly marked sub-points or bullet points for clarity. 
     ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE IF REQUIRED, ELSE GENERATED CONTENT.
