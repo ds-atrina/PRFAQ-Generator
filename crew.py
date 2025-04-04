@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from knowledge_base import CompanyKnowledgeBase
 from utils import remove_links
-from crewai_tools import ScrapeWebsiteTool, BraveSearchTool
+from crewai_tools import ScrapeWebsiteTool
 from kb_tool import KnowledgeBaseTool
 
 # Configure logging
