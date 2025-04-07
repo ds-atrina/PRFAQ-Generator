@@ -84,8 +84,8 @@ def main():
         topic = st.text_input("Title*", "", placeholder="at least 3 characters", help= "Enter a concise title showcasing the main theme of your content.\ne.g., AI-Powered PRFAQ Generator", label_visibility="visible")
         problem = st.text_input("Problem*", "", placeholder="at least 50 characters", help= "Describe the issue or challenge that your solution addresses. Provide sufficient detail to clearly convey the problem.\ne.g., Crafting comprehensive PRFAQs is often time-consuming and requires significant effort, leading to delays in product development and communication", label_visibility="visible")
         solution = st.text_input("Solution*", "", placeholder="at least 50 characters", help= "Explain how your product or service effectively resolves the identified problem. Ensure the description is detailed.\ne.g., Introducing an AI-powered PRFAQ generator that automates the creation of detailed and accurate PRFAQs, streamlining the process and reducing time-to-market",  label_visibility="visible")
-        web_scraping_link = st.text_input("Web Scraping Link (if any)", "", help= "Provide the URL of the webpage from which data needs to be extracted. Ensure the link is valid and accessible")
-        reference_pdf = st.file_uploader("Upload Reference Document (if any)", type=["pdf", "docx"], help= "Attach a PDF or DOCX document that serves as a reference for your content. This could include reports, whitepapers, or existing PRFAQs")
+        web_scraping_link = st.text_input("Webpage Link (if any)", "", help= "Provide one URL of the webpage from which data needs to be extracted. Ensure the link is valid and accessible")
+        reference_pdf = st.file_uploader("Upload Reference Document (if any)", type=["pdf", "docx"], help= "Attach one PDF or DOCX document that serves as a reference for your content. This could include reports, whitepapers, or existing PRFAQs")
 
         if st.button("Generate PR FAQ"):
             if len(topic) < 3:
@@ -124,7 +124,7 @@ def main():
                             st.write(f"Reference document {reference_pdf.name} read and processed.")
                         else:
                             st.error("Only pdf and docx files allowed.")
-                            
+
                 with st.spinner('Generating the PRFAQ for you...'):
                     # Define inputs for PR FAQ generation
                     inputs = {
@@ -154,33 +154,34 @@ def main():
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
                 st.write(f"It took me {execution_time:.2f} seconds to generate this PR FAQ for you!")
+    
+    if st.session_state.pr_faq:
+        # Display chat messages from history on app rerun
+        for message in st.session_state.chat_history:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    # Display chat messages from history on app rerun
-    for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        # React to user input
+        if prompt := st.chat_input("Enter your feedback or prompt:"):
+            # Display user message in chat message container
+            st.chat_message("user").markdown(prompt)
+            # Add user message to chat history
+            st.session_state.chat_history.append({"role": "user", "content": prompt})
 
-    # React to user input
-    if prompt := st.chat_input("Enter your feedback or prompt:"):
-        # Display user message in chat message container
-        st.chat_message("user").markdown(prompt)
-        # Add user message to chat history
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
+            with st.spinner('Updating your PRFAQ...'):
+                # Process feedback or new prompt
+                if st.session_state.pr_faq:
+                    new_output = modify_faq(st.session_state.pr_faq, prompt)
+                    response = display_output(new_output)
+                    st.session_state.pr_faq = new_output
+                else:
+                    response = f"{response}"
 
-        with st.spinner('Updating your PRFAQ...'):
-            # Process feedback or new prompt
-            if st.session_state.pr_faq:
-                new_output = modify_faq(st.session_state.pr_faq, prompt)
-                response = display_output(new_output)
-                st.session_state.pr_faq = new_output
-            else:
-                response = f"{response}"
-
-            # Display assistant response in chat message container
-            with st.chat_message("assistant"):
-                st.markdown(response)
-            # Add assistant response to chat history
-            st.session_state.chat_history.append({"role": "assistant", "content": response})
+                # Display assistant response in chat message container
+                with st.chat_message("assistant"):
+                    st.markdown(response)
+                # Add assistant response to chat history
+                st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 if __name__ == "__main__":
     main()
