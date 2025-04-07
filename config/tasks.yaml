@@ -22,13 +22,13 @@ content_generation_task:
     Follow the exact JSON template below, using placeholders for any specific dates, names, or locations:
     {{
       "Title": "1 FINANCE ANNOUNCES THE LAUNCH OF XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
-      "Subtitle": "[The subtitle reframes the headline solution. Write one sentence about the benefits.]",
-      "IntroParagraph": "[Location] - [Launch Date] - [2-4 sentences summarizing the product and benefits in a self-contained paragraph.]",
-      "CustomerProblems": "[2-4 sentences describing the customer problems this product solves, from the customer's perspective.]",
-      "Solution": "[2-4 sentences describing how the product addresses these problems. For complex products, multiple paragraphs may be needed.]",
-      "LeadersQuote": "[A single quote from a leader explaining why the product was developed and how it solves key issues. Use single quotes for quoting.]",
+      "Subtitle": "The subtitle reframes the headline solution. Write one sentence about the benefits.",
+      "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences summarizing the product and benefits in a self-contained paragraph.",
+      "CustomerProblems": "2-4 sentences describing the customer problems this product solves, from the customer's perspective.",
+      "Solution": "2-4 sentences describing how the product addresses these problems. For complex products, multiple paragraphs may be needed.",
+      "LeadersQuote": "A single quote from a leader explaining why the product was developed and how it solves key issues. Use single quotes for quoting.",
       "CustomerQuotes": "[A list of genuine-sounding quotes from customers describing their pain points and how the product helps, using single quotes.]",
-      "GettingStarted": "[1-3 sentences on how a customer can start using the product, with enough detail to instill confidence.]"
+      "GettingStarted": "1-3 sentences on how a customer can start using the product, with enough detail to instill confidence."
     }}
   expected_output: >
     A JSON object strictly following the provided template with all required sections using information from reference document and scraped web page.
