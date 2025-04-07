@@ -47,7 +47,7 @@ class PRFAQGeneratorCrew:
         self.solution = inputs.get('solution')
         self.content = inputs.get('content', "Default content")
         self.context = inputs.get('context', "Default context")
-        self.reference_doc_content = inputs.get('reference_doc_content', "No reference document content")
+        self.reference_doc_content = inputs.get('reference_doc_content', '')
         self.web_scraping_link = inputs.get('web_scraping_link', '')
         self.inputs = inputs
 
@@ -205,9 +205,18 @@ class PRFAQGeneratorCrew:
     @crew
     def crew(self) -> Crew:
         """Creates the PR FAQ Generator crew"""
+        # if not self.reference_doc_content and not self.:
+        list_agents = [self.web_scrape_extractor(), self.extract_info_agent(), self.content_generation_agent(), self.faq_generation_agent()]
+        list_tasks = [self.web_scrape_extraction_task(), self.extract_info_task(), self.content_generation_task(), self.faq_generation_task()]
+        if not self.reference_doc_content:
+            list_agents.remove(self.extract_info_agent())
+            list_tasks.remove(self.extract_info_task())
+        if not self.web_scraping_link:
+            list_agents.remove(self.web_scrape_extractor())
+            list_tasks.remove(self.web_scrape_extraction_task())
         return Crew(
-            agents=[self.web_scrape_extractor(), self.extract_info_agent(), self.content_generation_agent(), self.faq_generation_agent()],
-            tasks=[self.web_scrape_extraction_task(), self.extract_info_task(), self.content_generation_task(), self.faq_generation_task()],
+            agents=list_agents,
+            tasks=list_tasks,
             process=Process.sequential,
             verbose=True,
             planning=True

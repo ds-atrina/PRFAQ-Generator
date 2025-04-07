@@ -6,5 +6,6 @@ langchain
 langchain-openai==0.2.6
 langchain-community
 crewai-tools==0.13.4  
+python-docx
 pysqlite3-binary
 setuptools
