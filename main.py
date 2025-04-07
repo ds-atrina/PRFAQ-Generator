@@ -95,7 +95,7 @@ def main():
             elif len(solution) < 50:
                 st.error("Solution input is too short. Please enter at least 50 characters.")
             else:
-                with st.spinner('Generating the PRFAQ for you...'):
+                with st.spinner('Processing your inputs...'):
                     # Knowledge base initialization
                     start_time = time.perf_counter()
                     kb_path = 'vector_store/'
@@ -103,12 +103,13 @@ def main():
 
                     knowledge_base = CompanyKnowledgeBase(kb_path)
                     if provided_kb_pdf:
-                        st.write(f"Updating knowledge base with {provided_kb_pdf}...")
+                        # st.write(f"Updating knowledge base with {provided_kb_pdf}...")
                         if not knowledge_base.is_document_in_kb(provided_kb_pdf):
                             knowledge_base.add_pdf(provided_kb_pdf)
-                            st.write("Knowledge base vector DB updated.")
+                            # st.write("Knowledge base vector DB updated.")
                         else:
-                            st.write(f"Document {provided_kb_pdf} is already in the knowledge base.")
+                            # st.write(f"Document {provided_kb_pdf} is already in the knowledge base.")
+                            pass
 
                     # Extract reference document content
                     reference_doc_content = ""
@@ -123,7 +124,8 @@ def main():
                             st.write(f"Reference document {reference_pdf.name} read and processed.")
                         else:
                             st.error("Only pdf and docx files allowed.")
-
+                            
+                with st.spinner('Generating the PRFAQ for you...'):
                     # Define inputs for PR FAQ generation
                     inputs = {
                         'topic': topic,
