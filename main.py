@@ -69,7 +69,7 @@ def modify_faq(existing_faq, user_feedback):
 
 def main():
     st.set_page_config(layout="wide")
-    st.title("PR FAQ Generator (Interactive)")
+    st.title("PR/FAQ Generator (Test v1.0)")
 
     # Store PR FAQ and chat history in session state
     if "pr_faq" not in st.session_state:
