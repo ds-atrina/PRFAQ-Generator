@@ -33,7 +33,7 @@ def display_output(output):
     pr_faq_str += f"**Getting Started:** {output.get('GettingStarted', '')}\n\n"
     pr_faq_str += f"**Customer Quotes:**\n"
     for quote in output.get("CustomerQuotes", []):
-        pr_faq_str += f"- {quote}\n"
+        pr_faq_str += f"\n_{quote}_\n"
     pr_faq_str += f"\n**Internal FAQs:**\n"
     for faq in output.get("InternalFAQs", []):
         pr_faq_str += f"\n**Q: {faq.get('Question', faq.get('question', 'Unknown Question'))}**\n"
@@ -82,16 +82,16 @@ def main():
 
         # User Inputs
         topic = st.text_input("Title*", "", placeholder="at least 3 characters", help= "Enter a concise title showcasing the main theme of your content.\ne.g., AI-Powered PRFAQ Generator", label_visibility="visible")
-        problem = st.text_input("Problem*", "", placeholder="at least 50 characters", help= "Describe the issue or challenge that your solution addresses. Provide sufficient detail to clearly convey the problem.\ne.g., Crafting comprehensive PRFAQs is often time-consuming and requires significant effort, leading to delays in product development and communication", label_visibility="visible")
+        problem = st.text_input("Problem*", "", placeholder="at least 20 characters", help= "Describe the issue or challenge that your solution addresses. Provide sufficient detail to clearly convey the problem.\ne.g., Crafting comprehensive PRFAQs is often time-consuming and requires significant effort, leading to delays in product development and communication", label_visibility="visible")
         solution = st.text_input("Solution*", "", placeholder="at least 50 characters", help= "Explain how your product or service effectively resolves the identified problem. Ensure the description is detailed.\ne.g., Introducing an AI-powered PRFAQ generator that automates the creation of detailed and accurate PRFAQs, streamlining the process and reducing time-to-market",  label_visibility="visible")
-        web_scraping_link = st.text_input("Webpage Link (if any)", "", help= "Provide one URL of the webpage from which data needs to be extracted. Ensure the link is valid and accessible")
-        reference_pdf = st.file_uploader("Upload Reference Document (if any)", type=["pdf", "docx"], help= "Attach one PDF or DOCX document that serves as a reference for your content. This could include reports, whitepapers, or existing PRFAQs")
+        web_scraping_links = st.text_input("Webpage Links (if any)", "", help= "Provide comma separated URLs of the webpages from which data needs to be extracted. Ensure the links are valid and accessible")
+        reference_docs = st.file_uploader("Upload Reference Documents (if any)", type=["pdf", "docx"], accept_multiple_files=True, help= "Attach one PDF or DOCX document that serves as a reference for your content. This could include reports, whitepapers, or existing PRFAQs")
 
         if st.button("Generate PR FAQ"):
             if len(topic) < 3:
                 st.error("Title is too short. Please enter at least 3 characters.")
-            elif len(problem) < 50:
-                st.error("Problem input is too short. Please enter at least 50 characters.")
+            elif len(problem) < 20:
+                st.error("Problem input is too short. Please enter at least 20 characters.")
             elif len(solution) < 50:
                 st.error("Solution input is too short. Please enter at least 50 characters.")
             else:
@@ -111,19 +111,22 @@ def main():
                             # st.write(f"Document {provided_kb_pdf} is already in the knowledge base.")
                             pass
 
-                    # Extract reference document content
-                    reference_doc_content = ""
-                    if reference_pdf:
-                        file_extension = os.path.splitext(reference_pdf.name)[1].lower()
-                        if file_extension == ".pdf":
-                            reference_doc_content = extract_text_from_pdf(reference_pdf)
-                            st.write(f"Reference document {reference_pdf.name} read and processed.")
-                        elif file_extension == ".docx":
-                            doc = docx.Document(io.BytesIO(reference_pdf.read()))
-                            reference_doc_content = "\n".join([para.text for para in doc.paragraphs])
-                            st.write(f"Reference document {reference_pdf.name} read and processed.")
-                        else:
-                            st.error("Only pdf and docx files allowed.")
+                    reference_doc_content = []
+                    if reference_docs:
+                        for reference_doc in reference_docs:
+                            content=""
+                            file_extension = os.path.splitext(reference_doc.name)[1].lower()
+                            if file_extension == ".pdf":
+                                content += extract_text_from_pdf(reference_doc)
+                                st.write(f"Reference document {reference_doc.name} read and processed.")
+                            elif file_extension == ".docx":
+                                doc = docx.Document(io.BytesIO(reference_doc.read()))
+                                content += "\n".join([para.text for para in doc.paragraphs])
+                                st.write(f"Reference document {reference_doc.name} read and processed.")
+                            else:
+                                st.error(f"Only pdf and docx files are allowed. {reference_doc.name} is not a valid file type.")
+                            reference_doc_content.append(content)
+
 
                 with st.spinner('Generating the PRFAQ for you...'):
                     # Define inputs for PR FAQ generation
@@ -134,7 +137,7 @@ def main():
                         'context': 'This is some default context.',
                         'content': 'This is some default content.',
                         'reference_doc_content': reference_doc_content,
-                        'web_scraping_link': web_scraping_link
+                        'web_scraping_links': web_scraping_links
                     }
 
                     # Generate PR FAQ using Crew
@@ -154,6 +157,8 @@ def main():
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
                 st.write(f"It took me {execution_time:.2f} seconds to generate this PR FAQ for you!")
+                print(f"Tasks Output: {crew_output.tasks_output}")
+                print(f"Token Usage: {crew_output.token_usage}")
     
     if st.session_state.pr_faq:
         # Display chat messages from history on app rerun
@@ -161,15 +166,11 @@ def main():
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        # React to user input
         if prompt := st.chat_input("Enter your feedback or prompt:"):
-            # Display user message in chat message container
             st.chat_message("user").markdown(prompt)
-            # Add user message to chat history
             st.session_state.chat_history.append({"role": "user", "content": prompt})
 
             with st.spinner('Updating your PRFAQ...'):
-                # Process feedback or new prompt
                 if st.session_state.pr_faq:
                     new_output = modify_faq(st.session_state.pr_faq, prompt)
                     response = display_output(new_output)
@@ -177,10 +178,8 @@ def main():
                 else:
                     response = f"{response}"
 
-                # Display assistant response in chat message container
                 with st.chat_message("assistant"):
                     st.markdown(response)
-                # Add assistant response to chat history
                 st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 if __name__ == "__main__":
