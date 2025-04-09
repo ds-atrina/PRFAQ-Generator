@@ -18,6 +18,4 @@ class KnowledgeBaseTool(BaseTool):
 
     def _run(self, query: str) -> str:
         results = self._knowledge_base.similarity_search(query)
-        # Process results to extract relevant information
-        # For simplicity, returning the raw results
         return str(results)

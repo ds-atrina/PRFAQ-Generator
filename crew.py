@@ -53,7 +53,7 @@ class PRFAQGeneratorCrew:
         self.custom_llm = LLM(
             model="o3-mini",  # Specify the model name
             reasoning_effort = "medium",
-            temperature=0.6,        
+            temperature=0.2,        
             seed=42
         )
 
