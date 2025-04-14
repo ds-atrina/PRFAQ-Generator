@@ -69,7 +69,7 @@ def modify_faq(existing_faq, user_feedback):
 
 def main():
     st.set_page_config(layout="wide")
-    st.title("PR/FAQ Generator (Test v1.0)")
+    st.title("PR/FAQ Generator (Beta v1.1)")
 
     # Store PR FAQ and chat history in session state
     if "pr_faq" not in st.session_state:
@@ -84,7 +84,7 @@ def main():
         topic = st.text_input("Title*", "", placeholder="at least 3 characters", help= "Enter a concise title showcasing the main theme of your content.\ne.g., AI-Powered PRFAQ Generator", label_visibility="visible")
         problem = st.text_input("Problem*", "", placeholder="at least 20 characters", help= "Describe the issue or challenge that your solution addresses. Provide sufficient detail to clearly convey the problem.\ne.g., Crafting comprehensive PRFAQs is often time-consuming and requires significant effort, leading to delays in product development and communication", label_visibility="visible")
         solution = st.text_input("Solution*", "", placeholder="at least 50 characters", help= "Explain how your product or service effectively resolves the identified problem. Ensure the description is detailed.\ne.g., Introducing an AI-powered PRFAQ generator that automates the creation of detailed and accurate PRFAQs, streamlining the process and reducing time-to-market",  label_visibility="visible")
-        web_scraping_links = st.text_input("Webpage Links (if any)", "", help= "Provide comma separated URLs of the webpages from which data needs to be extracted. Ensure the links are valid and accessible")
+        web_scraping_links = st.text_input("Reference Links (if any)", "", help= "Provide comma separated URLs of the webpages from which data needs to be extracted. Ensure the links are valid and accessible")
         reference_docs = st.file_uploader("Upload Reference Documents (if any)", type=["pdf", "docx"], accept_multiple_files=True, help= "Attach one PDF or DOCX document that serves as a reference for your content. This could include reports, whitepapers, or existing PRFAQs")
 
         if st.button("Generate PR FAQ"):
