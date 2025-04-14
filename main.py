@@ -78,9 +78,27 @@ def main():
         st.session_state.chat_history = []
 
     with st.sidebar:
-        st.header("Inputs")
+        with st.expander("How to Use Guide"):
+            st.markdown("""
+                **How to Use**
+
+                - **Fill out the required fields in the sidebar**:
+                    - **Title**: Enter a concise title for your PRFAQ (minimum 3 characters).
+                    - **Problem**: Describe the challenge or issue your solution addresses (minimum 20 characters).
+                    - **Solution**: Explain how your solution resolves the problem (minimum 50 characters).
+                    - **Reference Links**: *Optional* Provide URLs for additional reference material.
+                    - **Upload Reference Documents**: *Optional* Upload PDF or DOCX files for context.
+
+                - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-5 minutes** depending on the complexity of your inputs.)
+
+                - **View Execution Details**: The app will display the generated PRFAQ and the time taken to generate it.
+
+                - **Interact with the Chat**: You can review the PRFAQ once created and provide feedback or additional prompts to refine it.
+            """)
 
         # User Inputs
+        st.header("Inputs")
+        
         topic = st.text_input("Title*", "", placeholder="at least 3 characters", help= "Enter a concise title showcasing the main theme of your content.\ne.g., AI-Powered PRFAQ Generator", label_visibility="visible")
         problem = st.text_input("Problem*", "", placeholder="at least 20 characters", help= "Describe the issue or challenge that your solution addresses. Provide sufficient detail to clearly convey the problem.\ne.g., Crafting comprehensive PRFAQs is often time-consuming and requires significant effort, leading to delays in product development and communication", label_visibility="visible")
         solution = st.text_input("Solution*", "", placeholder="at least 50 characters", help= "Explain how your product or service effectively resolves the identified problem. Ensure the description is detailed.\ne.g., Introducing an AI-powered PRFAQ generator that automates the creation of detailed and accurate PRFAQs, streamlining the process and reducing time-to-market",  label_visibility="visible")
@@ -157,7 +175,7 @@ def main():
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
                 st.write(f"It took me {execution_time:.2f} seconds to generate this PR FAQ for you!")
-                print(f"Tasks Output: {crew_output.tasks_output}")
+                # print(f"Tasks Output: {crew_output.tasks_output}")
                 print(f"Token Usage: {crew_output.token_usage}")
     
     if st.session_state.pr_faq:
