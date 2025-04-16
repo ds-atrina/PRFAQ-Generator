@@ -1,5 +1,5 @@
 pymupdf
-chromadb
+qdrant-client
 crewai==0.76.9
 streamlit==1.28.1
 langchain
