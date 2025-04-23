@@ -152,6 +152,7 @@ def main():
                     - **Solution**: Explain how your solution resolves the problem (minimum 50 characters).
                     - **Reference Links**: *Optional* Provide URLs for additional reference material.
                     - **Upload Reference Documents**: *Optional* Upload PDF or DOCX files for context.
+                    - **Use Web Search**: Turn the switch on to use web search capabilities for generating your PRFAQ using latest and relevant information.
 
                 - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-5 minutes** depending on the complexity of your inputs.)
 
