@@ -9,7 +9,7 @@ def extract_text_from_pdf(pdf_file) -> str:
     """Extract text from a PDF file using PyMuPDF (fitz)."""
     try:
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-        text = "\n".join(page.get_text("text") for page in doc)  # Ensure text extraction mode is specified
+        text = "\n".join(page.get_text("text") for page in doc) 
         if not text:
             raise ValueError("No text extracted from PDF.")
         return text

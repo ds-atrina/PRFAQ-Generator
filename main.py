@@ -1,6 +1,6 @@
-# __import__('pysqlite3')
-# import sys
-# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import io
@@ -173,10 +173,10 @@ def main():
         if st.button("Generate PR FAQ"):
             if len(topic) < 3:
                 st.error("Title is too short. Please enter at least 3 characters.")
-            # elif len(problem) < 20:
-            #     st.error("Problem is too short. Please enter at least 20 characters.")
-            # elif len(solution) < 50:
-            #     st.error("Solution is too short. Please enter at least 50 characters.")
+            elif len(problem) < 20:
+                st.error("Problem is too short. Please enter at least 20 characters.")
+            elif len(solution) < 50:
+                st.error("Solution is too short. Please enter at least 50 characters.")
             else:
                 # Validate links
                 links_list = [link.strip() for link in web_scraping_links.split(",") if link.strip()]

@@ -341,10 +341,9 @@ class SearxNGTrustedSearchTool(BaseTool):
             ]
             results = sorted(scored, key=lambda x: x['score'], reverse=True)[:MAX_RESULTS]
 
-        # Ensure we process at least 5 results or all available results
         processed_count = 0
-        for result in results:  # Go through all results if fewer than 5 valid ones are found
-            if processed_count >= 5:  # Stop once we have processed 5 successful results
+        for result in results:  
+            if processed_count >= 5: 
                 break
 
             url = result.get("url")

@@ -39,17 +39,6 @@ def qdrant_tool(question: str) -> str:
         with_payload=True
     )
 
-    # prompt = "Context:\n"
-    # for result in search_result.points:
-    #     prompt += result.payload['text'] + "\n---\n"
-    # prompt += "Question:" + question + "\n---\nAnswer:"
-
-    # completion = client.chat.completions.create(
-    #     model="gpt-4o",
-    #     messages=[{"role": "user", "content": prompt}]
-    # )
-
-    # return completion.choices[0].message.content
     return search_result
 
 class QdrantTool(BaseTool):

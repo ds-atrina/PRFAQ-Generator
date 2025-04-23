@@ -8,7 +8,6 @@ from crewai.project import CrewBase, agent, crew, task
 from pydantic import BaseModel
 from utils import remove_links, get_openai_llm
 from crewai_tools import ScrapeWebsiteTool, WebsiteSearchTool
-# from brave_search_tool import BraveSearchTool
 from searxng_search import SearxNGTrustedSearchTool
 from whitelisted_sites import whitelisted_domain_list, whitelisted_site_list
 from qdrant_tool import kb_qdrant_tool 
@@ -141,43 +140,6 @@ class PRFAQGeneratorCrew:
             logic=task_logic,
             output_pydantic=KBContent 
         )
-    
-    # @task
-    # def web_search_task(self) -> Task:
-    #     def task_logic(inputs):
-    #         # Extract inputs
-    #         product_name = inputs.get("product_name", "Default Product")
-    #         product_context = inputs.get("product_context", "Default Context")
-    #         topic = inputs.get("topic", "Default Topic")
-    #         problem = inputs.get("problem", "Default Problem")
-    #         solution = inputs.get("solution", "Default Solution")
-
-    #         # Construct the query based on the product name and its context
-    #         query = (
-    #             f"Gather information related to {product_name}. "
-    #             f"The product focuses on {product_context}. "
-    #             f"We are investigating {topic} to address {problem} using {solution}. "
-    #             "Search for trusted data sources, relevant regulations, and industry best practices."
-    #         )
-
-    #         # Use the Brave Search Tool to search within the whitelisted websites
-    #         web_search_response = self.web_search_tool.run(
-    #             search_query=query,
-    #             topic=topic,
-    #             problem=problem,
-    #             solution=solution
-    #         )
-
-    #         # Return the response
-    #         return {
-    #             "web_search_response": web_search_response
-    #         }
-
-    #     return Task(
-    #         config=self.tasks_config['web_search_task'],
-    #         logic=task_logic,
-    #         tools=[self.web_search_tool]  # Use the BraveSearchTool
-    #     )
 
     @task
     def web_search_task(self) -> Task:
@@ -187,10 +149,6 @@ class PRFAQGeneratorCrew:
             problem = inputs.get("problem", "Default Problem")
             solution = inputs.get("solution", "Default Solution")
             
-            # Construct the query
-            # query = f"We plan to make {topic}. We are trying to solve {problem} using {solution}. Gather any latest, relevant information about this."
-
-            # Use the RAG tool to search within the whitelisted websites
             web_rag_response = self.web_search_tool.run(topic=topic, problem=problem, solution=solution)
 
             return {
