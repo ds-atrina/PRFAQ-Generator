@@ -112,9 +112,9 @@ def modify_faq(existing_faq, user_feedback, problem, solution):
     """
 
 
-    print("\n\n\nrefined query:",refined_query)
-    print("\n\n\nweb response:",web_response)
-    print("\n\n\nkb response:",kb_response)
+    # print("\n\n\nrefined query:",refined_query)
+    # print("\n\n\nweb response:",web_response)
+    # print("\n\n\nkb response:",kb_response)
     response = llm.invoke(prompt)
     response_text = str(response.content)
     response_text = response_text.replace("```json","").replace("```","").strip()
