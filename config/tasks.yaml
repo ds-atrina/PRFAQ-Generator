@@ -97,10 +97,10 @@ faq_generation_task:
 
     Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, CustomerProblems, Solution, LeadersQuote, CustomerQuotes, GettingStarted) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
     You may ask a few relevant questions based on web search results too in order the enhance the FAQs and make them more recent or specific. Avoid numbering the questions in the FAQs.
-    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance, tables where applicable, and clearly marked sub-points or bullet points (\n-) or bold or italics for clarity. 
-    ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE RETRIEVAL TASK OUTPUT IF REQUIRED, ELSE GENERATED CONTENT.
+    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (\n-) or bold or italics for clarity. 
+    ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE RETRIEVAL TASK OUTPUT IF REQUIRED, ELSE GENERATED CONTENT. AVOID REDUNDANCY AND INCONSISTENCY.
   expected_output: >
-    A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using tables, sub-points, bold or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
+    A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using proper markdown-formatted tables, sub-points, bold or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
     {{
       "Title": "Revolutionizing AI Assistants",
       "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
