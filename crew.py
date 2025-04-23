@@ -7,7 +7,10 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from pydantic import BaseModel
 from utils import remove_links, get_openai_llm
-from crewai_tools import ScrapeWebsiteTool
+from crewai_tools import ScrapeWebsiteTool, WebsiteSearchTool
+# from brave_search_tool import BraveSearchTool
+from searxng_search import SearxNGTrustedSearchTool
+from whitelisted_sites import whitelisted_domain_list, whitelisted_site_list
 from qdrant_tool import kb_qdrant_tool 
 from dotenv import load_dotenv
 
@@ -56,7 +59,13 @@ class PRFAQGeneratorCrew:
         self.context = inputs.get('context', "Default context")
         self.reference_doc_content = inputs.get('reference_doc_content', '')
         self.web_scraping_links = inputs.get('web_scraping_links', '')
+        self.use_websearch = inputs.get('use_websearch',True)
         self.inputs = inputs
+        self.whitelisted_domain_list = whitelisted_domain_list
+
+        # self.web_search_tool = BraveSearchTool(api_key=os.getenv("BRAVE_API_KEY"))
+        self.web_search_tool = SearxNGTrustedSearchTool()
+        # self.web_rag_tool = WebsiteSearchTool()
 
     @agent
     def kb_agent(self) -> Agent:
@@ -64,6 +73,15 @@ class PRFAQGeneratorCrew:
             config=self.agents_config['kb_agent'],
             verbose=True,
             tools=[kb_qdrant_tool],  
+            llm= get_openai_llm()
+        )
+
+    @agent
+    def web_search_agent(self) -> Agent:
+        return Agent(
+            config=self.agents_config['web_search_agent'],
+            verbose=True,
+            tools=[self.web_search_tool],  # Use the wrapped tool instance
             llm= get_openai_llm()
         )
 
@@ -122,6 +140,67 @@ class PRFAQGeneratorCrew:
             config=self.tasks_config['kb_retrieval_task'],
             logic=task_logic,
             output_pydantic=KBContent 
+        )
+    
+    # @task
+    # def web_search_task(self) -> Task:
+    #     def task_logic(inputs):
+    #         # Extract inputs
+    #         product_name = inputs.get("product_name", "Default Product")
+    #         product_context = inputs.get("product_context", "Default Context")
+    #         topic = inputs.get("topic", "Default Topic")
+    #         problem = inputs.get("problem", "Default Problem")
+    #         solution = inputs.get("solution", "Default Solution")
+
+    #         # Construct the query based on the product name and its context
+    #         query = (
+    #             f"Gather information related to {product_name}. "
+    #             f"The product focuses on {product_context}. "
+    #             f"We are investigating {topic} to address {problem} using {solution}. "
+    #             "Search for trusted data sources, relevant regulations, and industry best practices."
+    #         )
+
+    #         # Use the Brave Search Tool to search within the whitelisted websites
+    #         web_search_response = self.web_search_tool.run(
+    #             search_query=query,
+    #             topic=topic,
+    #             problem=problem,
+    #             solution=solution
+    #         )
+
+    #         # Return the response
+    #         return {
+    #             "web_search_response": web_search_response
+    #         }
+
+    #     return Task(
+    #         config=self.tasks_config['web_search_task'],
+    #         logic=task_logic,
+    #         tools=[self.web_search_tool]  # Use the BraveSearchTool
+    #     )
+
+    @task
+    def web_search_task(self) -> Task:
+        def task_logic(inputs):
+            # Extract inputs
+            topic = inputs.get("topic", "Default Topic")
+            problem = inputs.get("problem", "Default Problem")
+            solution = inputs.get("solution", "Default Solution")
+            
+            # Construct the query
+            # query = f"We plan to make {topic}. We are trying to solve {problem} using {solution}. Gather any latest, relevant information about this."
+
+            # Use the RAG tool to search within the whitelisted websites
+            web_rag_response = self.web_search_tool.run(topic=topic, problem=problem, solution=solution)
+
+            return {
+                "web_rag_response": web_rag_response
+            }
+
+        return Task(
+            config=self.tasks_config['web_search_task'],
+            logic=task_logic,
+            tools=[self.web_search_tool]  # Only the RAG tool is needed
         )
 
     @task
@@ -192,27 +271,13 @@ class PRFAQGeneratorCrew:
             config=self.tasks_config['content_generation_task'],
             logic=task_logic,
             output_pydantic=GeneratedContent,
-            context=[self.kb_retrieval_task(), self.web_scrape_extraction_task(), self.extract_info_task()]
+            context=[self.kb_retrieval_task(), self.web_search_task(), self.web_scrape_extraction_task(), self.extract_info_task()]
         )
 
     @task
     def faq_generation_task(self) -> Task:
         def task_logic(inputs):
             topic = inputs.get('topic', 'Default Topic')
-            # content_str = inputs.get('generated_content', '').strip().strip("```json").strip("```").strip()
-
-            # try:
-            #     content_json = json.loads(content_str)
-            # except json.JSONDecodeError:
-            #     return {"error": "Generated content is not valid JSON"}
-
-            # extracted_content = {
-            #     "IntroParagraph": content_json.get("IntroParagraph", ""),
-            #     "CustomerProblems": content_json.get("CustomerProblems", ""),
-            #     "Solution": content_json.get("Solution", "")
-            # }
-
-            # generated_content = json.dumps(extracted_content)
 
             # Generate FAQs using the agent
             faq_agent = self.faq_generation_agent()
@@ -236,14 +301,17 @@ class PRFAQGeneratorCrew:
             #tools=[kb_qdrant_tool],
             logic=task_logic,
             output_pydantic=FAQ,
-            context=[self.kb_retrieval_task(), self.content_generation_task()]
+            context=[self.kb_retrieval_task(), self.web_search_task(), self.content_generation_task()]
         )
 
     @crew
     def crew(self) -> Crew:
         """Creates the PR FAQ Generator crew"""
-        list_agents = [self.kb_agent(), self.web_scrape_extractor(), self.extract_info_agent(), self.content_generation_agent(), self.faq_generation_agent()]
-        list_tasks = [self.kb_retrieval_task(), self.web_scrape_extraction_task(), self.extract_info_task(), self.content_generation_task(), self.faq_generation_task()]
+        list_agents = [self.kb_agent(), self.web_search_agent(), self.web_scrape_extractor(), self.extract_info_agent(), self.content_generation_agent(), self.faq_generation_agent()]
+        list_tasks = [self.kb_retrieval_task(), self.web_search_task(), self.web_scrape_extraction_task(), self.extract_info_task(), self.content_generation_task(), self.faq_generation_task()]
+        if not self.use_websearch:
+            list_agents.remove(self.web_search_agent())
+            list_tasks.remove(self.web_search_task())
         if not self.reference_doc_content:
             list_agents.remove(self.extract_info_agent())
             list_tasks.remove(self.extract_info_task())

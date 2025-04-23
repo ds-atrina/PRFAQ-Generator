@@ -8,6 +8,34 @@ kb_retrieval_task:
     A structured JSON object containing the retrieved information from the knowledge base.
   agent: kb_agent
   
+web_search_task:
+  description: >
+    Use the following workflow to gather relevant and credible information about a product's name, the problem it plans to solve and how it plans to solve it:
+    
+    1. Identify the most appropriate and relevant sites from the trusted domains list, provided the information: 
+        Topic: {topic}, Problem: {problem}, and Solution: {solution}. 
+        For example:
+        - For a product like "PlanMyTax," focus on income tax rules, laws, and data.
+        - For a product like "DocuLocker," focus on data security standards, privacy regulations, and document storage practices.
+        - For a product like "P2P Lending," focus on peer-to-peer lending regulations, financial compliance, risk management practices, and borrower-lender matchmaking platforms.
+
+    2. Search for information using the `web_search_tool` in selected sites.
+    3. Extract detailed and contextual insights from these trusted domains and ensure accuracy and credibility.
+    4. If no direct results are available, provide related insights and information from broader web sources.
+
+  expected_output: >
+    A detailed, multi-source research summary that includes:
+    - Key insights extracted from the specified trusted websites (cite the source for each insight).
+    - Any additional supporting information from general web searches, clearly distinguished from official sources.
+    - A final analysis that synthesizes the findings and provides actionable insights regarding the product context, topic, problem, and solution.
+    
+    The summary should be structured into sections:
+    - **Trusted Sources Insights**: Detailed findings from official and trusted domains.
+    - **General Web Insights**: Supplementary information from broader web searches.
+    - **Final Analysis**: A synthesis of all findings with actionable recommendations.
+
+  agent: web_search_agent
+
 web_scrape_extraction_task:
   description: >
     Visit and scrape content from the given links: ```{web_scraping_links}``` using the Web Scraping Tool.
@@ -29,7 +57,7 @@ extract_info_task:
 
 content_generation_task:
   description: >
-    Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt.
+    Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt, the knowledge base information received from the output of kb_retrieval_task and web search output of web_search_task..
     Follow the exact JSON template below, using placeholders for any specific dates, names, or locations:
     {{
       "Title": "1 FINANCE ANNOUNCES THE LAUNCH OF XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
@@ -48,6 +76,7 @@ content_generation_task:
 faq_generation_task:
   description: >
     Take a moment to think about all possible questions that can be asked about this offering or topic.
+    USE THE OUTPUT OF kb_retrieval_task to answer questions. Only if the relevant information is not available from the available knowledge base information, use the generated content to answer them.
     Based on the generated PR FAQ introduction, create a comprehensive FAQ document divided into two categories:
        1.**Internal FAQs**: (18-25 questions) focusing on:
         - Business rationale and market need
@@ -67,10 +96,11 @@ faq_generation_task:
         - Support, integrations, and future updates
 
     Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, CustomerProblems, Solution, LeadersQuote, CustomerQuotes, GettingStarted) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
-    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance where applicable, and clearly marked sub-points or bullet points or bold or italics for clarity. 
+    You may ask a few relevant questions based on web search results too in order the enhance the FAQs and make them more recent or specific. Avoid numbering the questions in the FAQs.
+    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance, tables where applicable, and clearly marked sub-points or bullet points (\n-) or bold or italics for clarity. 
     ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE RETRIEVAL TASK OUTPUT IF REQUIRED, ELSE GENERATED CONTENT.
   expected_output: >
-    A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using bullets, bold or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
+    A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using tables, sub-points, bold or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
     {{
       "Title": "Revolutionizing AI Assistants",
       "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
@@ -101,6 +131,17 @@ faq_generation_task:
           {{
               "Question": "Can the AI assistant handle multiple languages?",
               "Answer": "Absolutely! It supports multiple languages and can be customized based on user needs."
+          }},
+          {{
+              "Question": "Can I use Markdown-style tables?",
+              "Answer": "| Feature         | Benefit        |\n|------------------|----------------|\n| Auto-Generate    | Saves time     |\n| LLM-Driven       | Context aware  |"
+          }},
+          {{
+              "Question": "Can I also return JSON-style tables?",
+              "Answer": [
+                {{"Input Type": "Markdown Table", "Support": "Yes"}},
+                {{"Input Type": "JSON Table", "Support": "Yes"}}
+              ]
           }}
       ]
     }}

@@ -6,6 +6,17 @@ kb_agent:
   backstory: >
     You are a knowledge base expert at 1 Finance, skilled in quickly locating and delivering precise information from the company's repository to ensure all generated content is well-informed and aligned with organizational knowledge.
 
+web_search_agent:
+  role: >
+    Comprehensive Web Researcher
+  goal: >
+    Think critically about the most appropriate and specified trusted sites to conduct thorough, multi-perspective web research on a product, its context, and the given topic, problem, and solution. 
+    Your goal is to return useful, credible information by carefully cross-referencing official and trusted channels.
+  backstory: >
+    You are a specialized research agent trained to identify reliable and appropriate sites for any topic and search through them to gather information. 
+    You prioritize factual accuracy, relevance, and always check for data from trusted sites.
+    Your expertise lies in understanding and validating data to provide actionable insights.
+  
 web_scrape_extractor:
   role: >
     Web Page Content Scraper and Extractor
@@ -35,6 +46,7 @@ content_generation_agent:
       5. The extracted information from reference document (if available): Output of extract_info_task
       6. The web-scraped information (if available) and how it is relevant to 1 Finance's new offering: Output of web_scrape_extraction_task
       7. Any relevant information extracted from the knowledge base: Output of kb_retrieval_task
+      8. Any relevant information extracted from web search Output of web_search_task
 
     ONLY USE INFORMATION PRESENT IN THE KNOWLEDGE BASE DO NOT MAKE UP INFORMATION.
     Ensure that no specific dates, names, or locations are mentioned—use placeholders instead—and follow the provided JSON template exactly.
@@ -83,7 +95,9 @@ faq_generation_agent:
         - Key features and known limitations
         - Security, privacy, and data handling
         - Support, integrations, and future updates
-    Use only the content from the generated content and knowledge base output. Follow the provided strict JSON format exactly.
+    
+    Use the output of kb_retrieval_task to answer each question, only if relevant information is not found, use the generated content to answer it.
+    Use only the content from the generated content, knowledge base output and web search results. Follow the provided strict JSON format exactly.
 
     While generating the FAQs and answers, follow these stylistic and tone guidelines:
     - Use British English (e.g., "capitalise," "colour").

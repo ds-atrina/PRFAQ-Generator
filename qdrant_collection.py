@@ -76,7 +76,7 @@ def insert_data(get_points):
 )
     
 ####
-pdf_path = "1F_KB.pdf.pdf"
+pdf_path = "1F_KB.pdf"
 get_raw_text=extract_text_from_pdf(pdf_path)
 
 chunks=get_text_chunks(get_raw_text)

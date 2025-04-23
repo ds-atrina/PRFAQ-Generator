@@ -1,6 +1,6 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import io
@@ -10,9 +10,11 @@ import docx
 import json
 import time
 import openai
-from utils import extract_text_from_pdf
+from utils import extract_text_from_pdf, render_text_or_table_to_str
 from langchain_openai import ChatOpenAI  
 from crew import PRFAQGeneratorCrew
+from searxng_search import SearxNGTrustedSearchTool
+from qdrant_tool import kb_qdrant_tool
 
 # Ensure `src/` is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
@@ -36,26 +38,83 @@ def display_output(output):
 
     pr_faq_str += f"\n**Internal FAQs:**\n"
     for faq in output.get("InternalFAQs", []):
-            pr_faq_str += f"\n**Q: {faq.get('Question', faq.get('question', 'Unknown Question'))}**\n"
-            pr_faq_str += f"\nA: {faq.get('Answer', faq.get('answer', 'No answer provided'))}\n"
+        question = faq.get('Question', faq.get('question', 'Unknown Question'))
+        answer = faq.get('Answer', faq.get('answer', 'No answer provided'))
+
+        pr_faq_str += f"\n**Q: {question}**\n"
+        pr_faq_str += f"\nA:\n{render_text_or_table_to_str(answer)}\n"
+
     pr_faq_str += f"\n**External FAQs:**\n"
     for faq in output.get("ExternalFAQs", []):
-            pr_faq_str += f"\n**Q: {faq.get('Question', faq.get('question', 'Unknown Question'))}**\n"
-            pr_faq_str += f"\nA: {faq.get('Answer', faq.get('answer', 'No answer provided'))}\n"
+        question = faq.get('Question', faq.get('question', 'Unknown Question'))
+        answer = faq.get('Answer', faq.get('answer', 'No answer provided'))
+
+        pr_faq_str += f"\n**Q: {question}**\n"
+        pr_faq_str += f"\nA:\n{render_text_or_table_to_str(answer)}\n"
+
     return pr_faq_str
     
-def modify_faq(existing_faq, user_feedback):
-    llm = ChatOpenAI(model="gpt-4o") 
+def modify_faq(existing_faq, user_feedback, problem, solution):
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    refine_prompt = f"""
+        The user provided the following feedback:
+        "{user_feedback}"
+        The current PR FAQ is based on the following:
+        Problem statement: {problem}
+        Solution: {solution}
+
+        Based on this feedback and the given context, determine the most effective search query to put in a search engine to gather relevant and latest information.
+        You can consider India for location-specific searches if required unless mentioned otherwise.
+        Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+        Return ONLY the refined search query without any additional text. 
+    """
+    refined_query_response = llm.invoke(refine_prompt)
+    refined_query = refined_query_response.content.strip()
+
+    # Perform Web Search with the Refined Query
+    kb_tool = kb_qdrant_tool
+    kb_response = kb_qdrant_tool.run(refined_query)
+    web_tool = SearxNGTrustedSearchTool()
+    web_response = web_tool.search_with_query(refined_query)
+
+    # Use the refined query and web results to modify the FAQ
     prompt = f"""
-    Here is the existing PR FAQ in triple quotes:
-    ```{existing_faq}```
+        You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
 
-    The user provided the following feedback:
-    "{user_feedback}"
+        The PR FAQ is generated based on the following:
+        - Problem statement: {problem}
+        - Solution: {solution}
 
-    Modify only the necessary parts of the PR FAQ based on the feedback, DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the updated PR FAQ in STRICT JSON format.
+        User feedback:
+        "{user_feedback}"
+
+        A search was carried out for the feedback with the refined query:
+        "{refined_query}"
+
+        The web search returned the following results. Use this information to enhance the FAQ wherever relevant:
+        "{web_response}"
+        
+        The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
+        "{kb_response}"
+
+        Instructions:
+        - Modify the PR FAQ comprehensively based on the user feedback.
+        - Use relevant information from the search results or knowledge base to make appropriate changes or additions.
+        - Ensure that any new information aligns with the problem statement and solution provided.
+        - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
+        - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
+        - Assume any new feedback is a FAQ unless specified otherwise.
+        - DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the updated PR FAQ in STRICT JSON format.
+        - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
+
+        Here is the existing PR FAQ:
+        ```{existing_faq}```
     """
 
+
+    print("\n\n\nrefined query:",refined_query)
+    print("\n\n\nweb response:",web_response)
+    print("\n\n\nkb response:",kb_response)
     response = llm.invoke(prompt)
     response_text = str(response.content)
     response_text = response_text.replace("```json","").replace("```","").strip()
@@ -74,7 +133,7 @@ MAX_LINKS = 5
 
 def main():
     st.set_page_config(layout="wide")
-    st.title("PR/FAQ Generator (Beta v1.2)")
+    st.title("PR/FAQ Generator (Beta v2.0)")
 
     # Store PR FAQ and chat history in session state
     if "pr_faq" not in st.session_state:
@@ -109,15 +168,15 @@ def main():
         solution = st.text_input("Solution*", "", placeholder="at least 50 characters", help= "Explain how your product or service effectively resolves the identified problem. Ensure the description is detailed.\ne.g., Introducing an AI-powered PRFAQ generator that automates the creation of detailed and accurate PRFAQs, streamlining the process and reducing time-to-market",  label_visibility="visible")
         web_scraping_links = st.text_input("Reference Links (if any)", "", help= "Provide upto 5 comma separated URLs of the webpages that serve as a reference for your content. Ensure the links are valid and accessible")
         reference_docs = st.file_uploader("Upload Reference Documents (if any)", type=["pdf", "docx"], accept_multiple_files=True, help= "Attach upto 5 PDF or DOCX documents, each may be upto 25 MB, that serve as a reference for your content. This could include reports, whitepapers, or existing PRFAQs")
-        #use_websearch = st.toggle("Use Web Search", value=False)
+        use_websearch = st.toggle("Use Web Search", value=False)
 
         if st.button("Generate PR FAQ"):
             if len(topic) < 3:
                 st.error("Title is too short. Please enter at least 3 characters.")
-            elif len(problem) < 20:
-                st.error("Problem is too short. Please enter at least 20 characters.")
-            elif len(solution) < 50:
-                st.error("Solution is too short. Please enter at least 50 characters.")
+            # elif len(problem) < 20:
+            #     st.error("Problem is too short. Please enter at least 20 characters.")
+            # elif len(solution) < 50:
+            #     st.error("Solution is too short. Please enter at least 50 characters.")
             else:
                 # Validate links
                 links_list = [link.strip() for link in web_scraping_links.split(",") if link.strip()]
@@ -163,7 +222,8 @@ def main():
                         'context': 'This is some default context.',
                         'content': 'This is some default content.',
                         'reference_doc_content': reference_doc_content,
-                        'web_scraping_links': links_list
+                        'web_scraping_links': links_list,
+                        'use_websearch':use_websearch
                     }
 
                     # Generate PR FAQ using Crew
@@ -177,7 +237,7 @@ def main():
                         st.success("PR FAQ generated successfully!")
                         st.session_state.chat_history.append({"role": "assistant", "content": display_output(parsed_output)})
                     except json.JSONDecodeError as e:
-                        st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e))
+                        st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e), problem, solution)
                         
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
@@ -197,7 +257,7 @@ def main():
             with st.spinner('Updating your PRFAQ...'):
                 # Process feedback or new prompt
                 if st.session_state.pr_faq:
-                    new_output = modify_faq(st.session_state.pr_faq, prompt)
+                    new_output = modify_faq(st.session_state.pr_faq, prompt, problem, solution)
                     response = display_output(new_output)
                     st.session_state.pr_faq = new_output
                 else:

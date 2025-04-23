@@ -29,3 +29,14 @@ def get_openai_llm():
         seed=42
     )
 
+def render_text_or_table_to_str(text_or_data):
+    """
+    Converts structured table data or markdown strings to markdown-compatible string.
+    Used for string-based rendering (not direct Streamlit display).
+    """
+    if isinstance(text_or_data, list):
+        if all(isinstance(row, dict) for row in text_or_data):
+            return pd.DataFrame(text_or_data).to_markdown(index=False)
+        else:
+            return '\n'.join(f"- {item}" for item in text_or_data)
+    return text_or_data
