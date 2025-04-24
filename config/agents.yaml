@@ -43,13 +43,12 @@ content_generation_agent:
   goal: >
     Generate a detailed PR FAQ introduction in JSON format for the topic ```{topic}```, leveraging the following provided information and enhancing them if necessary :
       1. The topic on which FAQ is to be generated: ``{topic}```
-      2. Any additional provided context (if available): ```{context}```
-      3. The problem we are trying to tackle: ```{problem}```
-      4. The solution to the problem or the features of the offering: ```{solution}```
-      5. The extracted information from reference document (if available): Output of extract_info_task
-      6. The web-scraped information (if available) and how it is relevant to 1 Finance's new offering: Output of web_scrape_extraction_task
-      7. Any relevant information extracted from the knowledge base: Output of kb_retrieval_task
-      8. Any relevant information extracted from web search Output of web_search_task
+      2. The problem we are trying to tackle: ```{problem}```
+      3. The solution to the problem or the features of the offering: ```{solution}```
+      4. The extracted information from reference document (if available): Output of extract_info_task
+      5. The web-scraped information (if available) and how it is relevant to 1 Finance's new offering: Output of web_scrape_extraction_task
+      6. Any relevant information extracted from the knowledge base: Output of kb_retrieval_task
+      7. Any relevant information extracted from web search Output of web_search_task
 
     ONLY USE INFORMATION PRESENT IN THE KNOWLEDGE BASE DO NOT MAKE UP INFORMATION.
     Ensure that no specific dates, names, or locations are mentioned—use placeholders instead—and follow the provided JSON template exactly.

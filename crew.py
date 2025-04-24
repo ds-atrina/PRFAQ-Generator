@@ -54,8 +54,8 @@ class PRFAQGeneratorCrew:
         self.topic = inputs.get('topic')
         self.problem = inputs.get('problem')
         self.solution = inputs.get('solution')
-        self.content = inputs.get('content', "Default content")
-        self.context = inputs.get('context', "Default context")
+        # self.content = inputs.get('content', "Default content")
+        # self.context = inputs.get('context', "Default context")
         self.reference_doc_content = inputs.get('reference_doc_content', '')
         self.web_scraping_links = inputs.get('web_scraping_links', '')
         self.use_websearch = inputs.get('use_websearch',True)
@@ -242,14 +242,14 @@ class PRFAQGeneratorCrew:
         def task_logic(inputs):
             
             topic= inputs.get('topic', 'Default Topic'),
-            context= inputs.get('context', 'Default Context'),
+            # context= inputs.get('context', 'Default Context'),
             problem= inputs.get('problem', 'Default Problem'),
             solution= inputs.get('solution', 'Default Solution'),
             # reference_document= inputs.get('extracted_reference_doc_content', ''),
             # scraped_content= inputs.get('web_scrape_content', 'No scraped content')
 
             agent = self.content_generation_agent()
-            content = agent.execute(task_inputs={"topic":topic, "context":context, "problem":problem, "solution":solution})
+            content = agent.execute(task_inputs={"topic":topic, "problem":problem, "solution":solution})
 
             return {"generated_content": content}
 

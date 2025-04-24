@@ -9,3 +9,5 @@ python-docx
 qdrant-client
 pysqlite3-binary
 setuptools
+supabase
+postgrest

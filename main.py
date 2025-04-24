@@ -222,8 +222,8 @@ def main():
                         'topic': topic,
                         'problem': problem,
                         'solution': solution,
-                        'context': 'This is some default context.',
-                        'content': 'This is some default content.',
+                        # 'context': 'This is some default context.',
+                        # 'content': 'This is some default content.',
                         'reference_doc_content': reference_doc_content,
                         'web_scraping_links': links_list,
                         'use_websearch':use_websearch
