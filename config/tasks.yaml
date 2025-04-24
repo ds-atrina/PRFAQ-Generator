@@ -18,7 +18,7 @@ web_search_task:
         - For security or document storage solutions, consider domains related to cybersecurity, cloud storage, or data protection.
         - For lending or fintech products, consider sources covering peer-to-peer finance, lending norms, or fintech industry news.
 
-    2. Use an LLM to refine the query and generate an optimized search string:
+    2. Use an LLM to refine the query and generate an optimized search string sround the problem statement and solution, market trends, competitors, and other relevant aspects:
       - Avoid using specific names, brands, or years unless explicitly necessary.
       - Use generic yet comprehensive terms (e.g., "benefits", "trends", "impact") to ensure broad coverage.
       - Assume India as the default region unless stated otherwise.
