@@ -148,8 +148,36 @@ class PRFAQGeneratorCrew:
             topic = inputs.get("topic", "Default Topic")
             problem = inputs.get("problem", "Default Problem")
             solution = inputs.get("solution", "Default Solution")
+
+            llm = ChatOpenAI(model="gpt-4o", temperature=0)
+            refine_prompt = f"""
+                You are tasked with generating a highly effective web search query to support the creation of a PR FAQ document.
+
+                Here is the context:
+                - Topic: {topic}
+                - Problem Statement: {problem}
+                - Solution: {solution}
+
+                Your goal is to create a concise yet comprehensive search query that helps gather the latest and most relevant information to:
+                - Understand the current landscape of the problem,
+                - Explore existing solutions or competitors,
+                - Identify trends, statistics, and best practices related to the solution.
+
+                Assume India as the default region for search relevance unless specified otherwise.
+
+                Guidelines:
+                - Do NOT include proper nouns, brand names, or specific years in the query.
+                - Use general terms like "latest", "current", "trends", "adoption", "benefits", "challenges", or "impact".
+                - Focus on maximizing context coverage in as few words as possible.
+                - The query should reflect an intent to understand the domain, market, user behavior, and solution maturity.
+
+                Return ONLY the final refined search query without any additional explanation or formatting.
+            """
+
+            refined_query_response = llm.invoke(refine_prompt)
+            refined_query = refined_query_response.content.strip()
             
-            web_rag_response = self.web_search_tool.run(topic=topic, problem=problem, solution=solution)
+            web_rag_response = self.web_search_tool.run(query=refined_query)
 
             return {
                 "web_rag_response": web_rag_response

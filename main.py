@@ -54,16 +54,18 @@ def display_output(output):
 
     return pr_faq_str
     
-def modify_faq(existing_faq, user_feedback, problem, solution):
+def modify_faq(existing_faq, user_feedback, topic, problem, solution):
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
     refine_prompt = f"""
         The user provided the following feedback:
         "{user_feedback}"
-        The current PR FAQ is based on the following:
+        The current PR FAQ is based on the following context:
+        Topic: {topic}
         Problem statement: {problem}
         Solution: {solution}
 
-        Based on this feedback and the given context, determine the most effective search query to put in a search engine to gather relevant and latest information.
+        Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
+        Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
         You can consider India for location-specific searches if required unless mentioned otherwise.
         Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
         Return ONLY the refined search query without any additional text. 
@@ -75,7 +77,7 @@ def modify_faq(existing_faq, user_feedback, problem, solution):
     kb_tool = kb_qdrant_tool
     kb_response = kb_qdrant_tool.run(refined_query)
     web_tool = SearxNGTrustedSearchTool()
-    web_response = web_tool.search_with_query(refined_query)
+    web_response = web_tool.run(refined_query)
 
     # Use the refined query and web results to modify the FAQ
     prompt = f"""
@@ -98,8 +100,8 @@ def modify_faq(existing_faq, user_feedback, problem, solution):
         "{kb_response}"
 
         Instructions:
-        - Modify the PR FAQ comprehensively based on the user feedback.
-        - Use relevant information from the search results or knowledge base to make appropriate changes or additions.
+        - Modify the PR FAQ comprehensively based on the user feedback, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the prfaq.
+        - Use information from the search results or knowledge base to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
         - Ensure that any new information aligns with the problem statement and solution provided.
         - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
         - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
@@ -238,7 +240,7 @@ def main():
                         st.success("PR FAQ generated successfully!")
                         st.session_state.chat_history.append({"role": "assistant", "content": display_output(parsed_output)})
                     except json.JSONDecodeError as e:
-                        st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e), problem, solution)
+                        st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e), topic, problem, solution)
                         
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
@@ -258,7 +260,7 @@ def main():
             with st.spinner('Updating your PRFAQ...'):
                 # Process feedback or new prompt
                 if st.session_state.pr_faq:
-                    new_output = modify_faq(st.session_state.pr_faq, prompt, problem, solution)
+                    new_output = modify_faq(st.session_state.pr_faq, prompt, topic, problem, solution)
                     response = display_output(new_output)
                     st.session_state.pr_faq = new_output
                 else:

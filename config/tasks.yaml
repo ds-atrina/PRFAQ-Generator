@@ -1,7 +1,7 @@
 kb_retrieval_task:
   description: >
-    Retrieve relevant information from the knowledge base for the given query: 
-    "Retrieve information about {topic}. The problem is: {problem}. The proposed solution is: {solution}."
+    Retrieve ALL relevant information from the knowledge base for the given query: 
+    "Retrieve all information about {topic}. The problem is: {problem}. The proposed solution is: {solution}."
     Focus on providing detailed, structured, and accurate responses that align with 1 Finance's past products, policies, strategies, or other relevant company information.
     Return empty if no relevant content is found, **DO NOT USE INFORMATION FROM OTHER TASKS. DO NOT MAKE UP INFORMATION.**
   expected_output: >
@@ -10,29 +10,49 @@ kb_retrieval_task:
   
 web_search_task:
   description: >
-    Use the following workflow to gather relevant and credible information about a product's name, the problem it plans to solve and how it plans to solve it:
-    
-    1. Identify the most appropriate and relevant sites from the trusted domains list, provided the information: 
-        Topic: {topic}, Problem: {problem}, and Solution: {solution}. 
-        For example:
-        - For a product like "PlanMyTax," focus on income tax rules, laws, and data.
-        - For a product like "DocuLocker," focus on data security standards, privacy regulations, and document storage practices.
-        - For a product like "P2P Lending," focus on peer-to-peer lending regulations, financial compliance, risk management practices, and borrower-lender matchmaking platforms.
+    Use the following workflow to gather relevant and credible information for a given query:
+    1. Start with the provided query and analyze its context:
+      - Understand the query's focus, such as the topic, problem, or solution it relates to.
+      - Identify domains most likely to provide high-quality, accurate information for the query context. Examples:
+        - For financial tools, consider domains about compliance, taxation, or financial regulation.
+        - For security or document storage solutions, consider domains related to cybersecurity, cloud storage, or data protection.
+        - For lending or fintech products, consider sources covering peer-to-peer finance, lending norms, or fintech industry news.
 
-    2. Search for information using the `web_search_tool` in selected sites.
-    3. Extract detailed and contextual insights from these trusted domains and ensure accuracy and credibility.
-    4. If no direct results are available, provide related insights and information from broader web sources.
+    2. Use an LLM to refine the query and generate an optimized search string:
+      - Avoid using specific names, brands, or years unless explicitly necessary.
+      - Use generic yet comprehensive terms (e.g., "benefits", "trends", "impact") to ensure broad coverage.
+      - Assume India as the default region unless stated otherwise.
+
+    3. Determine the most relevant domains using an LLM and the query context:
+      - Select up to 3 domains from a trusted, predefined list of whitelisted sources.
+      - Include an empty string in the domain list to allow for general searches alongside domain-scoped searches.
+
+    4. Execute web searches using SearxNG for each domain:
+      - Format the search as "site:domain refined_query" for domain-specific queries.
+      - Use engines such as Google, Brave, DuckDuckGo, and Bing.
+
+    5. Retrieve and curate results:
+      - Extract title, URL, content snippet, and full article content (from <article> tags when available).
+      - Clean and structure results for easy consumption.
+      - Filter out low-value or broken pages, prioritizing high-quality content.
+
+    6. Score and sort results:
+      - Use relevance, content quality, and context alignment as scoring criteria.
+      - Fetch and process article tags for the top 5 results to extract detailed content insights.
+      - Include fallback notes if no results are found in trusted domains.
+
+    7. Return a curated list of results:
+      - Include a structured summary with trusted sources and general web insights.
+      - Provide actionable recommendations based on findings.
 
   expected_output: >
     A detailed, multi-source research summary that includes:
-    - Key insights extracted from the specified trusted websites (cite the source for each insight).
-    - Any additional supporting information from general web searches, clearly distinguished from official sources.
-    - A final analysis that synthesizes the findings and provides actionable insights regarding the product context, topic, problem, and solution.
-    
-    The summary should be structured into sections:
-    - **Trusted Sources Insights**: Detailed findings from official and trusted domains.
+    - **Trusted Sources Insights**: Findings from official and trusted domains.
     - **General Web Insights**: Supplementary information from broader web searches.
-    - **Final Analysis**: A synthesis of all findings with actionable recommendations.
+    - **Final Analysis**: A synthesized view of all findings with actionable recommendations.
+
+    The summary should be actionable, highlighting key takeaways and insights relevant to the query context.
+    Ensure that trusted sources are prioritized and clearly distinguish between official and general insights.
 
   agent: web_search_agent
 

@@ -9,12 +9,10 @@ from langchain_openai import ChatOpenAI
 from urllib.parse import urlencode, urlparse
 from whitelisted_sites import whitelisted_domain_list
 
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 class SearxSmartQuerySchema(BaseModel):
-    topic: str = Field(..., description="Topic or product name (e.g., PlanMyTax.ai)")
-    problem: str = Field(..., description="Problem being solved")
-    solution: str = Field(..., description="Proposed solution")
-
+    query: str = Field(..., description="Search query to find relevant information.")
 
 class SearxNGTrustedSearchTool(BaseTool):
     name: str = "SearxNG Trusted Search Tool"
@@ -23,13 +21,10 @@ class SearxNGTrustedSearchTool(BaseTool):
     )
     args_schema: Type[BaseModel] = SearxSmartQuerySchema
 
-    def _choose_relevant_domains(self, topic: str, problem: str, solution: str) -> List[str]:
-        llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    def _choose_relevant_domains(self, query: str) -> List[str]:
         prompt = (
             f"You are helping a researcher identify the most relevant websites to search.\n"
-            f"Product Idea: {topic}\n"
-            f"Problem: {problem}\n"
-            f"Solution: {solution}\n\n"
+            f"Query: {query}\n"
             f"Here is a list of approved domains:\n{chr(10).join(whitelisted_domain_list)} and their information:\n\n"
             """Below is a list of trusted, whitelisted sources and the types of data they provide:
             ---
@@ -140,7 +135,8 @@ class SearxNGTrustedSearchTool(BaseTool):
         for domain in whitelisted_domain_list:
             if domain.lower() in response.content.lower():
                 selected.append(domain)
-        return selected[:3]
+        selected.append("")
+        return selected
 
     def is_quality_content(self, text: str) -> bool:
         words = text.split()
@@ -223,16 +219,17 @@ class SearxNGTrustedSearchTool(BaseTool):
                 })
         return results
 
-    def _run(self, topic: str, problem: str, solution: str) -> Dict[str, Any]:
+    def _run(self, query: str) -> Dict[str, Any]:
+        """Search SearxNG with a freeform query and fetch content from top 5 sites."""
         searx_instance = "https://search.valenceai.in/search"
-        selected_domains = self._choose_relevant_domains(topic, problem, solution)
-
+        selected_domains = self._choose_relevant_domains(query)
+        
         if not selected_domains:
-            return {"error": "No relevant domains selected. Try a broader topic or revise inputs."}
+            return {"error": "No relevant domains selected. Try a broader query."}
 
         results = []
         for domain in selected_domains:
-            search_query = f"site:{domain} {topic} {problem} {solution}"
+            search_query = f"site:{domain} {query}" if domain else query
             payload = {
                 "q": search_query,
                 "format": "json",
@@ -272,7 +269,7 @@ class SearxNGTrustedSearchTool(BaseTool):
                     "search_query": search_query
                 })
 
-        MAX_RESULTS = 10
+        MAX_RESULTS = 20
         if len(results) > MAX_RESULTS:
             filtered = [r for r in results if 'content' in r and self.is_quality_content(r['content'])]
             scored = [
@@ -281,69 +278,14 @@ class SearxNGTrustedSearchTool(BaseTool):
                     "score": self.calculate_relevance_score(r, r.get("search_query", ""))
                 } for r in filtered
             ]
-            results = sorted(scored, key=lambda x: x['score'], reverse=True)[:MAX_RESULTS]
+            scored_results = sorted(scored, key=lambda x: x['score'], reverse=True)[:MAX_RESULTS]
+        else:
+            scored_results = results
 
-        return {
-            "search_results": results
-        }
-
-    def search_with_query(self, query: str) -> Dict[str, Any]:
-        """Search SearxNG with a freeform query and fetch content from top 5 sites."""
-        searx_instance = "https://search.valenceai.in/search"
-        payload = {
-            "q": query,
-            "format": "json",
-            "theme": "simple"
-        }
-
-        results = []
-        try:
-            # POST properly formatted form data
-            encoded_payload = urlencode(payload)
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json"
-            }
-            url = (
-                f"{searx_instance}?"
-                f"format=json&language=en&safesearch=1&engines=google,brave,duckduckgo,bing,yahoo,wikipedia,wikidata"
-            )
-            resp = requests.post(url, data=encoded_payload, headers=headers, timeout=10)
-            resp.raise_for_status()
-
-            if resp.headers.get("Content-Type", "").startswith("application/json"):
-                data = resp.json()
-                for result in data.get("results", []):
-                    results.append({
-                        "title": result.get("title"),
-                        "url": result.get("url"),
-                        "content": result.get("content", ""),
-                        "search_query": query
-                    })
-                else:
-                    results.extend(self._parse_html_response(resp.text))
-
-        except requests.exceptions.RequestException as e:
-            results.append({
-                "error": f"Error retrieving results",
-                "details": str(e),
-                "search_query": query
-            })
-
-        MAX_RESULTS = 20
-        if len(results) > MAX_RESULTS:
-            filtered = [r for r in results]
-            scored = [
-                {
-                    **r,
-                    "score": self.calculate_relevance_score(r, query)
-                } for r in filtered
-            ]
-            results = sorted(scored, key=lambda x: x['score'], reverse=True)[:MAX_RESULTS]
-
+        # Fetch article content for top 5 results
         processed_count = 0
-        for result in results:  
-            if processed_count >= 5: 
+        for result in scored_results:
+            if processed_count >= 5:
                 break
 
             url = result.get("url")
@@ -366,6 +308,4 @@ class SearxNGTrustedSearchTool(BaseTool):
                 except requests.exceptions.RequestException as e:
                     result["article_content"] = f"Error retrieving article content: {str(e)}"
 
-        return {
-            "search_results": results
-        }
+        return {"search_results": scored_results}
