@@ -13,7 +13,7 @@ import openai
 from utils import extract_text_from_pdf, render_text_or_table_to_str
 from langchain_openai import ChatOpenAI  
 from crew import PRFAQGeneratorCrew
-from searxng_search import SearxNGTrustedSearchTool
+from web_search import WebTrustedSearchTool
 from qdrant_tool import kb_qdrant_tool
 
 # Ensure `src/` is in the Python path
@@ -76,7 +76,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
     # Perform Web Search with the Refined Query
     kb_tool = kb_qdrant_tool
     kb_response = kb_qdrant_tool.run(refined_query)
-    web_tool = SearxNGTrustedSearchTool()
+    web_tool = WebTrustedSearchTool()
     web_response = web_tool.run(refined_query)
 
     # Use the refined query and web results to modify the FAQ
