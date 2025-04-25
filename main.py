@@ -64,11 +64,11 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
         Problem statement: {problem}
         Solution: {solution}
 
-        Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
-        Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
-        You can consider India for location-specific searches if required unless mentioned otherwise.
-        Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
-        Return ONLY the refined search query without any additional text. 
+        - Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
+        - Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
+        - You can consider India for location-specific searches if required unless mentioned otherwise.
+        - Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+        - Return ONLY the refined search query without any additional text.         
     """
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
@@ -108,6 +108,11 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
         - Assume any new feedback is a FAQ unless specified otherwise.
         - DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the updated PR FAQ in STRICT JSON format.
         - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
+        - While generating the FAQs and answers, follow these stylistic and tone guidelines:
+            - Use British English (e.g., "capitalise," "colour").
+            - Keep language human, positive and transparent.
+            - Ensure the tone is formal yet personable, clear, and consistent with brand values.
+            - Avoid technical jargon unless necessary, and explain all abbreviations/acronyms.
 
         Here is the existing PR FAQ:
         ```{existing_faq}```

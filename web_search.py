@@ -5,21 +5,23 @@ from typing import Type, List, Dict, Any
 import requests
 import datetime
 import re
+import os
+import time
 from langchain_openai import ChatOpenAI
 from urllib.parse import urlencode, urlparse
 from whitelisted_sites import whitelisted_domain_list
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
-class SearxSmartQuerySchema(BaseModel):
+class WebSearchQuerySchema(BaseModel):
     query: str = Field(..., description="Search query to find relevant information.")
 
-class SearxNGTrustedSearchTool(BaseTool):
-    name: str = "SearxNG Trusted Search Tool"
+class WebTrustedSearchTool(BaseTool):
+    name: str = "Web Trusted Search Tool"
     description: str = (
-        "Performs smart search on relevant whitelisted financial sites using a SearxNG instance"
+        "Performs smart search on relevant whitelisted financial sites using Web Search"
     )
-    args_schema: Type[BaseModel] = SearxSmartQuerySchema
+    args_schema: Type[BaseModel] = WebSearchQuerySchema
 
     def _choose_relevant_domains(self, query: str) -> List[str]:
         prompt = (
@@ -137,7 +139,7 @@ class SearxNGTrustedSearchTool(BaseTool):
                 selected.append(domain)
         selected.append("")
         return selected
-
+    
     def is_quality_content(self, text: str) -> bool:
         words = text.split()
         sentences = text.split(".")
@@ -220,8 +222,8 @@ class SearxNGTrustedSearchTool(BaseTool):
         return results
 
     def _run(self, query: str) -> Dict[str, Any]:
-        """Search SearxNG with a freeform query and fetch content from top 5 sites."""
-        searx_instance = "https://search.valenceai.in/search"
+        """Search Brave Search with a freeform query and fetch content from top 5 sites."""
+        brave_instance = "https://api.search.brave.com"
         selected_domains = self._choose_relevant_domains(query)
         
         if not selected_domains:
@@ -233,45 +235,61 @@ class SearxNGTrustedSearchTool(BaseTool):
             payload = {
                 "q": search_query,
                 "format": "json",
-                "theme": "simple"
+                "country": "IN",
+                "summary": True
             }
 
-            try:
-                # POST properly formatted form data
-                encoded_payload = urlencode(payload)
-                headers = {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json"
-                }
-                url = (
-                    f"{searx_instance}?"
-                    f"format=json&language=en&safesearch=1&engines=google,brave,duckduckgo,bing,yahoo,wikipedia,wikidata"
-                )
-                resp = requests.get(url, data=encoded_payload, headers=headers, timeout=10)
-                resp.raise_for_status()
+            retries = 3  # Maximum number of retries
+            backoff = 1  # Initial backoff time in seconds
 
-                if resp.headers.get("Content-Type", "").startswith("application/json"):
-                    data = resp.json()
-                    for result in data.get("results", []):
-                        results.append({
-                            "title": result.get("title"),
-                            "url": result.get("url"),
-                            "content": result.get("content", ""),
-                            "search_query": search_query
-                        })
-                else:
-                    results.extend(self._parse_html_response(resp.text))
+            while retries > 0:
+                try:
+                    # Brave Search API URL
+                    url = f"{brave_instance}/res/v1/web/search"
+                    headers = {
+                        "X-Subscription-Token": os.environ["BRAVE_API_KEY"],
+                        "Accept": "application/json",
+                    }
+                    resp = requests.get(url, headers=headers, params=payload, timeout=10)
+                    resp.raise_for_status()
+                    # print(resp.text)
+                    if resp.headers.get("Content-Type", "").startswith("application/json"):
+                        data = resp.json()
+                        for result in data.get("web", {}).get("results", []):  # Correctly navigate to 'web' -> 'results'
+                            results.append({
+                                "title": result.get("title"),
+                                "url": result.get("url"),
+                                "content": result.get("description", ""),  # Use 'description' instead of 'content'
+                                "search_query": search_query
+                            })
+                    else:
+                        self._parse_html_response(resp.text)
+                    break  # Exit the retry loop on success
 
-            except requests.exceptions.RequestException as e:
-                results.append({
-                    "error": f"Error retrieving from {domain}",
-                    "details": str(e),
-                    "search_query": search_query
-                })
+                except requests.exceptions.HTTPError as e:
+                    if resp.status_code == 429:  # Too Many Requests
+                        # print(f"Rate limited. Retrying in {backoff} seconds...")
+                        time.sleep(backoff)  # Wait before retrying
+                        backoff *= 2  # Exponential backoff
+                        retries -= 1
+                    else:
+                        # results.append({
+                        #     "error": f"Error retrieving from {domain}",
+                        #     "details": str(e),
+                        #     "search_query": search_query
+                        # })
+                        break
+                except requests.exceptions.RequestException as e:
+                    # results.append({
+                    #     "error": f"Error retrieving from {domain}",
+                    #     "details": str(e),
+                    #     "search_query": search_query
+                    # })
+                    break
 
         MAX_RESULTS = 20
         if len(results) > MAX_RESULTS:
-            filtered = [r for r in results if 'content' in r and self.is_quality_content(r['content'])]
+            filtered = [r for r in results if 'content' in r]
             scored = [
                 {
                     **r,
@@ -280,6 +298,13 @@ class SearxNGTrustedSearchTool(BaseTool):
             ]
             scored_results = sorted(scored, key=lambda x: x['score'], reverse=True)[:MAX_RESULTS]
         else:
+            filtered = [r for r in results if 'content' in r]
+            scored = [
+                {
+                    **r,
+                    "score": self.calculate_relevance_score(r, r.get("search_query", ""))
+                } for r in filtered
+            ]
             scored_results = results
 
         # Fetch article content for top 5 results
@@ -306,6 +331,7 @@ class SearxNGTrustedSearchTool(BaseTool):
                         processed_count += 1  # Increment the count of successfully processed results
 
                 except requests.exceptions.RequestException as e:
-                    result["article_content"] = f"Error retrieving article content: {str(e)}"
+                    # result["article_content"] = f"Error retrieving article content: {str(e)}"
+                    pass
 
         return {"search_results": scored_results}

@@ -1,21 +1,20 @@
 import json
 import os
 import logging
-from openai import OpenAI
+from langchain_openai import ChatOpenAI
 from typing import Dict, Any
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from pydantic import BaseModel
 from utils import remove_links, get_openai_llm
 from crewai_tools import ScrapeWebsiteTool, WebsiteSearchTool
-from searxng_search import SearxNGTrustedSearchTool
+from web_search import WebTrustedSearchTool
 from whitelisted_sites import whitelisted_domain_list, whitelisted_site_list
 from qdrant_tool import kb_qdrant_tool 
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -62,8 +61,8 @@ class PRFAQGeneratorCrew:
         self.inputs = inputs
         self.whitelisted_domain_list = whitelisted_domain_list
 
-        # self.web_search_tool = BraveSearchTool(api_key=os.getenv("BRAVE_API_KEY"))
-        self.web_search_tool = SearxNGTrustedSearchTool()
+        # self.web_search_tool = SearxNGTrustedSearchTool()
+        self.web_search_tool = WebTrustedSearchTool()
         # self.web_rag_tool = WebsiteSearchTool()
 
     @agent

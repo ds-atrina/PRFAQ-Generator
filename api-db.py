@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
@@ -112,8 +112,12 @@ def fetch_space_documents(spaceid: str):
     return merged_content
 
 
-@app.get("/prfaq/{spaceid}", response_model=PRFAQResponse)
-async def generate_prfaq(spaceid: str):
+@app.get("/prfaq", response_model=PRFAQResponse)
+async def generate_prfaq(
+    spaceid: str = Header(..., description="Space ID for which the PR FAQ needs to be generated"),
+    threadid: Optional[str] = Header(None, description="Thread ID for tracking the request"),
+    use_websearch: Optional[bool] = Header(False, description="Boolean flag to use web search")
+):
     """
     Generate a PR FAQ for a given spaceid by fetching data from the Supabase database.
     """
@@ -135,7 +139,7 @@ async def generate_prfaq(spaceid: str):
             "solution": solution,
             "web_scraping_links": links,
             "reference_doc_content": reference_content,
-            "use_websearch": False  # Set to False unless explicitly needed
+            "use_websearch": use_websearch  # Pass the boolean flag
         }
 
         # Instantiate and kickoff the PR FAQ generation
@@ -162,4 +166,4 @@ async def generate_prfaq(spaceid: str):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run("prfaq_api:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("api-db:app", host="0.0.0.0", port=port, reload=True)

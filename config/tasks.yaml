@@ -27,7 +27,7 @@ web_search_task:
       - Select up to 3 domains from a trusted, predefined list of whitelisted sources.
       - Include an empty string in the domain list to allow for general searches alongside domain-scoped searches.
 
-    4. Execute web searches using SearxNG for each domain:
+    4. Execute web searches using the web search tool for each domain:
       - Format the search as "site:domain refined_query" for domain-specific queries.
       - Use engines such as Google, Brave, DuckDuckGo, and Bing.
 
