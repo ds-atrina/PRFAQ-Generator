@@ -10,37 +10,39 @@ import docx
 import json
 import time
 import openai
+from openai import OpenAI
 from utils import extract_text_from_pdf, render_text_or_table_to_str
 from langchain_openai import ChatOpenAI  
-from langchain.agents import Tool
-from langchain.tools import BaseTool
 from crew import PRFAQGeneratorCrew
-from langgraph.graph import StateGraph, END
-from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig, RunnableLambda
-from searxng_search import SearxNGTrustedSearchTool
+from web_search import WebTrustedSearchTool
 from qdrant_tool import kb_qdrant_tool
-from modify_faq import modify_faq
+from dotenv import load_dotenv
+load_dotenv()
 
 # Ensure `src/` is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Set your OpenAI API key here or use an environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def display_output(output):
     """Function to display PR FAQ sections."""
     pr_faq_str = ""
+    pr_faq_str += f"*{output.get('UserResponse', '')}*\n\n"
     pr_faq_str += f"**Title:** {output.get('Title', '')}\n\n"
     pr_faq_str += f"**Subtitle:** {output.get('Subtitle', '')}\n\n"
     pr_faq_str += f"**Introduction Paragraph:** {output.get('IntroParagraph', '')}\n\n"
-    pr_faq_str += f"**Customer Problems:** {output.get('CustomerProblems', '')}\n\n"
+    pr_faq_str += f"**Problem Statement:** {output.get('ProblemStatement', '')}\n\n"
     pr_faq_str += f"**Solution:** {output.get('Solution', '')}\n\n"
-    pr_faq_str += f"**Leader's Quote:** {output.get('LeadersQuote', '')}\n\n"
-    pr_faq_str += f"**Getting Started:** {output.get('GettingStarted', '')}\n\n"
-    pr_faq_str += f"**Customer Quotes:**\n"
-    for quote in output.get("CustomerQuotes", []):
-        pr_faq_str += f"\n*{quote}*\n"
+    pr_faq_str += "**Leader's Quote:** \n\n"
+    pr_faq_str += "**Customer's Quote:** \n\n"
+
+    pr_faq_str += f"\n**Competitors:**\n"
+    for competitor in output.get("Competitors", []):
+        name = competitor.get("name", "")
+        url = competitor.get("url", "")
+        pr_faq_str += f"\n- [{name}]({url})\n"
 
     pr_faq_str += f"\n**Internal FAQs:**\n"
     for faq in output.get("InternalFAQs", []):
@@ -60,104 +62,94 @@ def display_output(output):
 
     return pr_faq_str
     
-# def modify_faq(existing_faq, user_feedback, problem, solution, topic):
-#     search_tool = SearxNGTrustedSearchTool()
-#     kb_tool = kb_qdrant_tool
+def modify_faq(existing_faq, user_feedback, topic, problem, solution):
+    llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+    refine_prompt = f"""
+        The user provided the following feedback:
+        "{user_feedback}"
+        The current PR FAQ is based on the following context:
+        Topic: {topic}
+        Problem statement: {problem}
+        Solution: {solution}
 
-#     tools = [
-#         Tool(
-#             name="Web Search",
-#             func=search_tool.search_with_query,
-#             description="Perform a web search to gather information required to modify the PR FAQ."
-#         ),
-#         Tool(
-#             name="Knowledge Base Search",
-#             func=kb_tool.run,
-#             description="Search internal company knowledge base."
-#         )
-#     ]
+        - Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
+        - Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
+        - You can consider India for location-specific searches if required unless mentioned otherwise.
+        - Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+        - Return ONLY the refined search query without any additional text.         
+    """
+    refined_query_response = llm.invoke(refine_prompt)
+    refined_query = refined_query_response.content.strip()
 
-#     # LLM
-#     llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    # Perform Web Search with the Refined Query
+    kb_tool = kb_qdrant_tool
+    kb_response = kb_qdrant_tool.run(refined_query)
+    web_tool = WebTrustedSearchTool()
+    web_response = web_tool.run(query=refined_query, trust=True)
 
-#     # Node: Prompt the LLM with PR FAQ update request
-#     def modify_prfaq_llm_node(state):
-#         topic = state['topic']
-#         problem = state['problem']
-#         solution = state['solution']
-#         feedback = state['user_feedback']
-#         existing = state['existing_faq']
+    # Use the refined query and web results to modify the FAQ
+    prompt = f"""
+        You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
 
-#         prompt = f"""
-#             You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
+        The PR FAQ is generated based on the following:
+        - Problem statement: {problem}
+        - Solution: {solution}
 
-#             The PR FAQ is generated based on the following:
-#             - Problem statement: {problem}
-#             - Solution: {solution}
+        User feedback:
+        "{user_feedback}"
 
-#             User feedback:
-#             "{feedback}"
+        A search was carried out for the feedback with the refined query:
+        "{refined_query}"
 
-#             If you need external info, you may call tools:
-#             - Web Search: for latest public info
-#             - Knowledge Base Search: for company docs
-
-#             Only modify the necessary sections. Assume anything new is a FAQ unless specified.
-
-#             ✅ Return STRICT JSON only. Use markdown tables if needed. No extra commentary.
-#             Here is the existing PR FAQ:
-#             ```{existing}```
-#         """
-#         return {
-#             "messages": [HumanMessage(content=prompt)]
-#         }
-
-#     tool_node = RunnableLambda(lambda state: {
-#         "tool_results": {
-#             tool.name: tool.func(state["tool_query"])  # You can control what gets sent here
-#             for tool in tools
-#         }
-#     })
-
-#     # Node: output parsing
-#     def format_json_output(state):
-#         raw = state.get("messages")[-1].content
-#         try:
-#             raw = raw.replace("```json", "").replace("```", "").strip()
-#             return {"updated_faq": json.loads(raw)}
-#         except Exception as e:
-#             return {"error": f"Failed to parse JSON: {str(e)}", "raw": raw}
-
-#     # 🧠 Graph definition
-#     def build_prfaq_graph():
-#         builder = StateGraph()
-#         builder.add_node("llm_modify", modify_prfaq_llm_node)
-#         builder.add_node("tools", tool_node)
-#         builder.add_node("json_output", format_json_output)
-
-#         # Just a linear flow here
-#         builder.set_entry_point("llm_modify")
-#         builder.add_edge("llm_modify", "json_output")
-#         builder.add_edge("json_output", END)
-
-#         return builder.compile()
-    
-#     graph = build_prfaq_graph()
-#     state = {
-#         "existing_faq": existing_faq,
-#         "user_feedback": user_feedback,
-#         "problem": problem,
-#         "solution": solution,
-#         "topic": topic
-#     }
-
-#     result = graph.invoke(state, config=RunnableConfig(configurable={"tags": ["prfaq-modifier"]}))
-#     if "updated_faq" in result:
-#         return result["updated_faq"]
-#     else:
-#         print("[DEBUG] Response not valid JSON:\n", result.get("raw", ""))
-#         return existing_faq
+        The web search returned the following results. Use this information to enhance the FAQ wherever relevant:
+        "{web_response}"
         
+        The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
+        "{kb_response}"
+
+        Instructions:
+        - Modify the PR FAQ comprehensively based on the user feedback, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the prfaq.
+        - Change the UserResponse field according to the user's feedback. It should be a reply to the user's message.
+        - Use information from the search results or knowledge base to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
+        - Ensure that any new information aligns with the problem statement and solution provided.
+        - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
+        - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
+        - Assume any new feedback is a FAQ unless specified otherwise.
+        - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format:
+            Title: str
+            Subtitle: str
+            IntroParagraph: str
+            ProblemStatement: str
+            Solution: str
+            Competitors: list
+            InternalFAQs: list
+            ExternalFAQs: list
+            UserResponse: str
+        - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
+        - While generating the FAQs and answers, follow these stylistic and tone guidelines:
+            - Use British English (e.g., "capitalise," "colour").
+            - Keep language human, positive and transparent.
+            - Ensure the tone is formal yet personable, clear, and consistent with brand values.
+            - Avoid technical jargon unless necessary, and explain all abbreviations/acronyms.
+
+        Here is the existing PR FAQ:
+        ```{existing_faq}```
+    """
+
+    # print("\n\n\nrefined query:",refined_query)
+    # print("\n\n\nweb response:",web_response)
+    # print("\n\n\nkb response:",kb_response)
+    response = llm.invoke(prompt)
+    response_text = str(response.content)
+    response_text = response_text.replace("```json","").replace("```","").strip()
+
+    try:
+        updated_faq = json.loads(response_text)
+        return updated_faq
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to parse the updated PR FAQ: {e}")
+        return existing_faq
+    
 MAX_FILES = 5
 MAX_FILE_SIZE_MB = 25
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
@@ -184,6 +176,7 @@ def main():
                     - **Solution**: Explain how your solution resolves the problem (minimum 50 characters).
                     - **Reference Links**: *Optional* Provide URLs for additional reference material.
                     - **Upload Reference Documents**: *Optional* Upload PDF or DOCX files for context.
+                    - **Use Web Search**: Turn the switch on to use web search capabilities for generating your PRFAQ using latest and relevant information.
 
                 - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-5 minutes** depending on the complexity of your inputs.)
 
@@ -205,10 +198,10 @@ def main():
         if st.button("Generate PR FAQ"):
             if len(topic) < 3:
                 st.error("Title is too short. Please enter at least 3 characters.")
-            # elif len(problem) < 20:
-            #     st.error("Problem is too short. Please enter at least 20 characters.")
-            # elif len(solution) < 50:
-            #     st.error("Solution is too short. Please enter at least 50 characters.")
+            elif len(problem) < 20:
+                st.error("Problem is too short. Please enter at least 20 characters.")
+            elif len(solution) < 50:
+                st.error("Solution is too short. Please enter at least 50 characters.")
             else:
                 # Validate links
                 links_list = [link.strip() for link in web_scraping_links.split(",") if link.strip()]
@@ -251,8 +244,8 @@ def main():
                         'topic': topic,
                         'problem': problem,
                         'solution': solution,
-                        'context': 'This is some default context.',
-                        'content': 'This is some default content.',
+                        'chat_history': ["Generate this PR FAQ for me"],
+                        # 'content': 'This is some default content.',
                         'reference_doc_content': reference_doc_content,
                         'web_scraping_links': links_list,
                         'use_websearch':use_websearch
@@ -269,12 +262,12 @@ def main():
                         st.success("PR FAQ generated successfully!")
                         st.session_state.chat_history.append({"role": "assistant", "content": display_output(parsed_output)})
                     except json.JSONDecodeError as e:
-                        st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e), problem, solution, topic)
+                        st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e), topic, problem, solution)
                         
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
                 st.write(f"It took me {execution_time:.2f} seconds to generate this PR FAQ for you!")
-                print(f"Token Usage: {crew_output.token_usage}")
+                # print(f"Token Usage: {crew_output.token_usage}")
     
     if st.session_state.pr_faq:
         for message in st.session_state.chat_history:
@@ -289,7 +282,7 @@ def main():
             with st.spinner('Updating your PRFAQ...'):
                 # Process feedback or new prompt
                 if st.session_state.pr_faq:
-                    new_output = modify_faq(st.session_state.pr_faq, prompt, problem, solution, topic)
+                    new_output = modify_faq(st.session_state.pr_faq, prompt, topic, problem, solution)
                     response = display_output(new_output)
                     st.session_state.pr_faq = new_output
                 else:
