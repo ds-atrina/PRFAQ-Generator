@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 from postgrest import APIError
 import os
@@ -21,9 +21,14 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Pydantic model for request body
+class Request(BaseModel):
+    messages: list
+
 # Pydantic models for request and response validation
 class PRFAQResponse(BaseModel):
     markdown_output: str
+    response_to_user: str
 
 def format_output(output):
     """Function to format PR FAQ sections."""
@@ -31,13 +36,10 @@ def format_output(output):
     pr_faq_str += f"**Title:** {output.get('Title', '')}\n\n"
     pr_faq_str += f"**Subtitle:** {output.get('Subtitle', '')}\n\n"
     pr_faq_str += f"**Introduction Paragraph:** {output.get('IntroParagraph', '')}\n\n"
-    pr_faq_str += f"**Customer Problems:** {output.get('CustomerProblems', '')}\n\n"
+    pr_faq_str += f"**Problem Statement:** {output.get('ProblemStatement', '')}\n\n"
     pr_faq_str += f"**Solution:** {output.get('Solution', '')}\n\n"
-    pr_faq_str += f"**Leader's Quote:** {output.get('LeadersQuote', '')}\n\n"
-    pr_faq_str += f"**Getting Started:** {output.get('GettingStarted', '')}\n\n"
-    pr_faq_str += f"**Customer Quotes:**\n"
-    for quote in output.get("CustomerQuotes", []):
-        pr_faq_str += f"\n*{quote}*\n"
+    pr_faq_str += "**Leader's Quote:** \n\n"
+    pr_faq_str += "**Customer's Quote:** \n\n"
 
     pr_faq_str += f"\n**Internal FAQs:**\n"
     for faq in output.get("InternalFAQs", []):
@@ -84,7 +86,7 @@ def fetch_space_details(spaceid: str):
     return resp.data[0]
 
 
-def fetch_space_documents(spaceid: str):
+def fetch_space_documents(spaceid: str, chatid: Optional[str]):
     """
     Fetch all content rows for the given spaceid from the `space_documents` table.
     Raises:
@@ -94,52 +96,66 @@ def fetch_space_documents(spaceid: str):
       str — merged content from all rows.
     """
     try:
-        resp = (
+        resp1 = (
             supabase
             .table("space_documents")
             .select("content")
             .eq("spaceid", spaceid)
             .execute()
         )
+        resp2 = (
+            supabase
+            .table("general_documents")
+            .select("content")
+            .eq("chatid", chatid)
+            .execute()
+        )
     except APIError as e:
         raise RuntimeError(f"Supabase API error: {e}") from e
 
-    if not resp.data:
-        raise LookupError(f"No documents found for spaceid {spaceid!r}")
+    merged_content = ""
+    if resp1.data:
+        merged_content += "\n".join(row["content"] for row in resp1.data) + "\n"
+    if resp2.data:
+        merged_content += "\n".join(row["content"] for row in resp2.data)
 
-    # Merge all content into a single string
-    merged_content = "\n".join(row["content"] for row in resp.data)
-    return merged_content
+    return merged_content.strip()
 
-
-@app.get("/prfaq", response_model=PRFAQResponse)
+@app.post("/prfaq", response_model=PRFAQResponse)
 async def generate_prfaq(
-    spaceid: str = Header(..., description="Space ID for which the PR FAQ needs to be generated"),
-    threadid: Optional[str] = Header(None, description="Thread ID for tracking the request"),
-    use_websearch: Optional[bool] = Header(False, description="Boolean flag to use web search")
+    request: Request,
+    x_space_id: str = Header(..., alias="x-space-id", description="Space ID for which the PR FAQ needs to be generated"),
+    x_thread_id: Optional[str] = Header(None, alias="x-thread-id", description="Thread ID for tracking the request"),
+    x_command: Optional[str] = Header(None, alias="x-command", description="Command in use"),
+    x_web_search: Optional[bool] = Header(False, alias="x-web-search", description="Boolean flag to use web search")
 ):
     """
     Generate a PR FAQ for a given spaceid by fetching data from the Supabase database.
     """
     try:
+        # Parse body to extract messages
+        messages = request.messages
+        if not messages:
+            messages = ["Generate PR/FAQ for me"]
         # Fetch space details
-        space = fetch_space_details(spaceid)
+        space = fetch_space_details(x_space_id)
         title = space["title"]
         solution = space["details"].get("solution", "")
         problem_statement = space["details"].get("problemStatement", "")
         links = space.get("links", "")
 
         # Fetch and merge content from space_documents
-        reference_content = fetch_space_documents(spaceid)
+        reference_content = fetch_space_documents(x_space_id, x_thread_id)
 
         # Prepare inputs for the Crew AI
         inputs = {
             "topic": title,
             "problem": problem_statement,
             "solution": solution,
+            "chat_history": messages, 
             "web_scraping_links": links,
             "reference_doc_content": reference_content,
-            "use_websearch": use_websearch  # Pass the boolean flag
+            "use_websearch": x_web_search  # Convert string to boolean
         }
 
         # Instantiate and kickoff the PR FAQ generation
@@ -150,9 +166,11 @@ async def generate_prfaq(
         cleaned_json = result.raw.replace("```json", "").replace("```", "").strip()
         parsed_output = json.loads(cleaned_json)
         markdown = format_output(parsed_output)
+        user_response = parsed_output.get("UserResponse", "Here's the generated document for you:")
 
         return {
-            "markdown_output": markdown
+            "markdown_output": markdown,
+            "response_to_user": user_response
         }
 
     except LookupError as e:
@@ -161,9 +179,3 @@ async def generate_prfaq(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run("api-db:app", host="0.0.0.0", port=port, reload=True)

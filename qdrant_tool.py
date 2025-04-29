@@ -33,9 +33,9 @@ def qdrant_tool(question: str) -> str:
     embedding = response.data[0].embedding
 
     search_result = connection.query_points(
-        collection_name="1finance_kb",
+        collection_name="1finance_kb_test",
         query=embedding,
-        limit=6,
+        limit=10,
         with_payload=True
     )
 

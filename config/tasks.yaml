@@ -46,7 +46,13 @@ web_search_task:
       - Provide actionable recommendations based on findings.
 
   expected_output: >
+    
     A detailed, multi-source research summary that includes:
+    - Key insights extracted from the specified trusted websites (cite the source for each insight).
+    - Any additional supporting information from general web searches, clearly distinguished from official sources.
+    - A final analysis that synthesizes the findings and provides actionable insights regarding the product context, topic, problem, and solution.
+
+    A summary should be structured into sections:
     - **Trusted Sources Insights**: Findings from official and trusted domains.
     - **General Web Insights**: Supplementary information from broader web searches.
     - **Final Analysis**: A synthesized view of all findings with actionable recommendations.
@@ -77,17 +83,16 @@ extract_info_task:
 
 content_generation_task:
   description: >
-    Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt, the knowledge base information received from the output of kb_retrieval_task and web search output of web_search_task..
+    Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt, the knowledge base information received from the {chat_history}, the output of kb_retrieval_task and web search output of web_search_task.
+    USE THE WEB SEARCH TOOL TO SEARCH FOR COMPETITORS WHO ARE TRYING TO SOLVE THE SAME {problem}, THE COMPANY/PRODUCT NAME AND THE COMPANY/PRODUCT URL AND SET TRUST TO FALSE.
     Follow the exact JSON template below, using placeholders for any specific dates, names, or locations:
     {{
-      "Title": "1 FINANCE ANNOUNCES THE LAUNCH OF XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
+      "Title": "1 FINANCE ANNOUNCES XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
       "Subtitle": "The subtitle reframes the headline solution. Write one sentence about the benefits.",
       "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
-      "CustomerProblems": "2-4 sentences describing the customer problems this product solves and briefly describe the problem and its negative impact from the customer's perspective.This section tests your assumptions about the pain-points that you are addressing.",
-      "Solution": "2-4 sentences describing how the new product addresses these problems.For more complex products, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
-      "LeadersQuote": "A single quote from a leader explaining why the product was developed and how it solves key issues. Use single quotes for quoting.",
-      "CustomerQuotes": "[A list of genuine-sounding quotes from customers describing their pain points and how the product helps, using single quotes.]",
-      "GettingStarted": "1-3 sentences on how a customer can start using the product, with enough detail to instill confidence."
+      "ProblemStatement": "2-4 sentences describing the problems this product plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
+      "Solution": "2-4 sentences describing how the new product addresses these problems. For more complex products, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
+      "Competitors": "[{{"name": "Company name or Product name", "url":"URL of the product website"}}]" [LIST OF JSON]
     }}
   expected_output: >
     A JSON object strictly following the provided template with all required sections using information from reference document and scraped web page.
@@ -96,9 +101,10 @@ content_generation_task:
 faq_generation_task:
   description: >
     Take a moment to think about all possible questions that can be asked about this offering or topic.
+    Use information from {chat_history} to make any necessary updates with the latest information.
     USE THE OUTPUT OF kb_retrieval_task to answer questions. Only if the relevant information is not available from the available knowledge base information, use the generated content to answer them.
     Based on the generated PR FAQ introduction, create a comprehensive FAQ document divided into two categories:
-       1.**Internal FAQs**: (18-25 questions) focusing on:
+       1.**Internal FAQs**: (17-20 questions) focusing on:
         - Business rationale and market need
         - Product vision and alignment with company strategy
         - Technical approach, risks, and scalability
@@ -107,32 +113,41 @@ faq_generation_task:
         - Resourcing, timeline, and launch readiness
         - Success metrics and future roadmap
 
-       2.**External FAQs**: (18-25 questions) focusing on:
+       2.**External FAQs**: (17-20 questions) focusing on:
         - What the product is and what problems it solves
         - Who it's for and how it's used
         - Pricing, availability, and onboarding process
         - Key features and known limitations
         - Security, privacy, and data handling
         - Support, integrations, and future updates
+    
+    Read the last user message in {chat_history}, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
 
-    Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, CustomerProblems, Solution, LeadersQuote, CustomerQuotes, GettingStarted) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
+    Important Prioritisation for Answering Each Question:
+    - Always follow this strict order of sourcing:
+    1. **First**, use relevant information from the Knowledge Base `kb_qdrant_tool` and the output of kb_retrieval_task. These should be the Primary sources for answering the question.
+    2. **Second**, if no suitable answer exists in the Knowledge Base, use output of web_search_task to construct the response.
+    3. **Third**, only if neither the Knowledge Base nor Web Search provides an answer, generate original content independently — ensuring strict factual accuracy, based only on verified information.
+
+    UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
+   
+    Ensure each FAQ question and answer covers a **distinct and meaningful** topic.
+    - **Do not** repeat the same ideas in slightly different wording.
+    - **Do not** introduce redundant, overlapping, or unnecessarily similar questions.
+    - Aim for maximum breadth, depth, and non-repetition across all FAQs.
+
+    Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, ProblemStatement, Solution) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
     You may ask a few relevant questions based on web search results too in order the enhance the FAQs and make them more recent or specific. Avoid numbering the questions in the FAQs.
-    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (\n-) or bold or italics for clarity. 
-    ONLY GENERATE ANSWERS FROM KNOWLEDGE BASE RETRIEVAL TASK OUTPUT IF REQUIRED, ELSE GENERATED CONTENT. AVOID REDUNDANCY AND INCONSISTENCY.
+    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+
   expected_output: >
     A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using proper markdown-formatted tables, sub-points, bold or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
     {{
       "Title": "Revolutionizing AI Assistants",
       "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
       "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
-      "CustomerProblems": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
+      "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
       "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
-      "LeadersQuote": "\"This AI assistant is a game-changer. It's designed to empower businesses with intelligent automation and efficiency.\" - CEO, TechCorp",
-      "GettingStarted": "To get started, businesses can sign up for our platform, customize their AI assistant, and integrate it with their existing workflows.",
-      "CustomerQuotes": [
-          "\"This AI assistant saved us hours of work every day!\" - Jane Doe, Operations Manager",
-          "\"Incredible efficiency boost for our customer service team.\" - John Smith, Support Lead"
-      ],
       "InternalFAQs": [
           {{
               "Question": "How does the AI assistant integrate with existing tools?",
@@ -150,7 +165,7 @@ faq_generation_task:
           }},
           {{
               "Question": "Can the AI assistant handle multiple languages?",
-              "Answer": "Absolutely! It supports multiple languages and can be customized based on user needs."
+              "Answer": "Absolutely! It's developed in a way that supports multiple languages and can be customized based on user needs."
           }},
           {{
               "Question": "Can I use Markdown-style tables?",
@@ -163,8 +178,9 @@ faq_generation_task:
                 {{"Input Type": "JSON Table", "Support": "Yes"}}
               ]
           }}
-      ]
+      ],
+      "UserResponse": "Here is the generated PR/FAQ document on topic and your provided inputs. Please review and let me know if any changes are needed."
     }}
-
+    THE OUTPUT SHOULD BE STRICTLY IN JSON.
   agent: faq_generation_agent
   

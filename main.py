@@ -25,16 +25,20 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 def display_output(output):
     """Function to display PR FAQ sections."""
     pr_faq_str = ""
+    pr_faq_str += f"*{output.get('UserResponse', '')}*\n\n"
     pr_faq_str += f"**Title:** {output.get('Title', '')}\n\n"
     pr_faq_str += f"**Subtitle:** {output.get('Subtitle', '')}\n\n"
     pr_faq_str += f"**Introduction Paragraph:** {output.get('IntroParagraph', '')}\n\n"
-    pr_faq_str += f"**Customer Problems:** {output.get('CustomerProblems', '')}\n\n"
+    pr_faq_str += f"**Problem Statement:** {output.get('ProblemStatement', '')}\n\n"
     pr_faq_str += f"**Solution:** {output.get('Solution', '')}\n\n"
-    pr_faq_str += f"**Leader's Quote:** {output.get('LeadersQuote', '')}\n\n"
-    pr_faq_str += f"**Getting Started:** {output.get('GettingStarted', '')}\n\n"
-    pr_faq_str += f"**Customer Quotes:**\n"
-    for quote in output.get("CustomerQuotes", []):
-        pr_faq_str += f"\n*{quote}*\n"
+    pr_faq_str += "**Leader's Quote:** \n\n"
+    pr_faq_str += "**Customer's Quote:** \n\n"
+
+    pr_faq_str += f"\n**Competitors:**\n"
+    for competitor in output.get("Competitors", []):
+        name = competitor.get("name", "")
+        url = competitor.get("url", "")
+        pr_faq_str += f"\n- [{name}]({url})\n"
 
     pr_faq_str += f"\n**Internal FAQs:**\n"
     for faq in output.get("InternalFAQs", []):
@@ -77,7 +81,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
     kb_tool = kb_qdrant_tool
     kb_response = kb_qdrant_tool.run(refined_query)
     web_tool = WebTrustedSearchTool()
-    web_response = web_tool.run(refined_query)
+    web_response = web_tool.run(query=refined_query, trust=True)
 
     # Use the refined query and web results to modify the FAQ
     prompt = f"""
@@ -101,6 +105,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
 
         Instructions:
         - Modify the PR FAQ comprehensively based on the user feedback, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the prfaq.
+        - Change the UserResponse field according to the user's feedback. It should be a reply to the user's message.
         - Use information from the search results or knowledge base to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
         - Ensure that any new information aligns with the problem statement and solution provided.
         - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
@@ -117,7 +122,6 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
         Here is the existing PR FAQ:
         ```{existing_faq}```
     """
-
 
     # print("\n\n\nrefined query:",refined_query)
     # print("\n\n\nweb response:",web_response)
@@ -227,7 +231,7 @@ def main():
                         'topic': topic,
                         'problem': problem,
                         'solution': solution,
-                        # 'context': 'This is some default context.',
+                        'chat_history': ["Generate this PR FAQ for me"],
                         # 'content': 'This is some default content.',
                         'reference_doc_content': reference_doc_content,
                         'web_scraping_links': links_list,
@@ -250,7 +254,7 @@ def main():
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
                 st.write(f"It took me {execution_time:.2f} seconds to generate this PR FAQ for you!")
-                print(f"Token Usage: {crew_output.token_usage}")
+                # print(f"Token Usage: {crew_output.token_usage}")
     
     if st.session_state.pr_faq:
         for message in st.session_state.chat_history:

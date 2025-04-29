@@ -15,6 +15,7 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 class WebSearchQuerySchema(BaseModel):
     query: str = Field(..., description="Search query to find relevant information.")
+    trust: bool = Field(True, description="Whether to search on trusted sites more.")
 
 class WebTrustedSearchTool(BaseTool):
     name: str = "Web Trusted Search Tool"
@@ -137,7 +138,7 @@ class WebTrustedSearchTool(BaseTool):
         for domain in whitelisted_domain_list:
             if domain.lower() in response.content.lower():
                 selected.append(domain)
-        selected.append("")
+
         return selected
     
     def is_quality_content(self, text: str) -> bool:
@@ -221,13 +222,14 @@ class WebTrustedSearchTool(BaseTool):
                 })
         return results
 
-    def _run(self, query: str) -> Dict[str, Any]:
+    def _run(self, query: str, trust:bool) -> Dict[str, Any]:
         """Search Brave Search with a freeform query and fetch content from top 5 sites."""
         brave_instance = "https://api.search.brave.com"
-        selected_domains = self._choose_relevant_domains(query)
-        
-        if not selected_domains:
-            return {"error": "No relevant domains selected. Try a broader query."}
+        selected_domains=[]
+        if trust:
+            selected_domains = self._choose_relevant_domains(query)
+            
+        selected_domains.append("")
 
         results = []
         for domain in selected_domains:
@@ -306,32 +308,32 @@ class WebTrustedSearchTool(BaseTool):
                 } for r in filtered
             ]
             scored_results = results
+        if trust:
+            # Fetch article content for top 5 results
+            processed_count = 0
+            for result in scored_results:
+                if processed_count >= 5:
+                    break
 
-        # Fetch article content for top 5 results
-        processed_count = 0
-        for result in scored_results:
-            if processed_count >= 5:
-                break
+                url = result.get("url")
+                if url:
+                    try:
+                        response = requests.get(url, timeout=10)
+                        response.raise_for_status()
+                        soup = BeautifulSoup(response.text, 'html.parser')
 
-            url = result.get("url")
-            if url:
-                try:
-                    response = requests.get(url, timeout=10)
-                    response.raise_for_status()
-                    soup = BeautifulSoup(response.text, 'html.parser')
+                        # Extract content from <article> tags
+                        article_content = ""
+                        for article in soup.find_all("article"):
+                            article_content += article.get_text(separator="\n").strip() + "\n"
 
-                    # Extract content from <article> tags
-                    article_content = ""
-                    for article in soup.find_all("article"):
-                        article_content += article.get_text(separator="\n").strip() + "\n"
+                        # Append article content if available
+                        if article_content.strip():
+                            result["article_content"] = article_content.strip()[:10000]
+                            processed_count += 1  # Increment the count of successfully processed results
 
-                    # Append article content if available
-                    if article_content.strip():
-                        result["article_content"] = article_content.strip()[:10000]
-                        processed_count += 1  # Increment the count of successfully processed results
-
-                except requests.exceptions.RequestException as e:
-                    # result["article_content"] = f"Error retrieving article content: {str(e)}"
-                    pass
+                    except requests.exceptions.RequestException as e:
+                        # result["article_content"] = f"Error retrieving article content: {str(e)}"
+                        pass
 
         return {"search_results": scored_results}

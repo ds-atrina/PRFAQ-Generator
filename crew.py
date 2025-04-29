@@ -37,13 +37,12 @@ class FAQ(BaseModel):
     Title: str
     Subtitle: str
     IntroParagraph: str
-    CustomerProblems: str
+    ProblemStatement: str
     Solution: str
-    LeadersQuote: str
-    CustomerQuotes: list
-    GettingStarted: str
+    Competitors: list
     InternalFAQs: list
     ExternalFAQs: list
+    UserResponse: str
 
 @CrewBase
 class PRFAQGeneratorCrew:
@@ -53,7 +52,7 @@ class PRFAQGeneratorCrew:
         self.topic = inputs.get('topic')
         self.problem = inputs.get('problem')
         self.solution = inputs.get('solution')
-        # self.content = inputs.get('content', "Default content")
+        self.chat_history = inputs.get('chat_history', [""])
         # self.context = inputs.get('context', "Default context")
         self.reference_doc_content = inputs.get('reference_doc_content', '')
         self.web_scraping_links = inputs.get('web_scraping_links', '')
@@ -61,9 +60,7 @@ class PRFAQGeneratorCrew:
         self.inputs = inputs
         self.whitelisted_domain_list = whitelisted_domain_list
 
-        # self.web_search_tool = SearxNGTrustedSearchTool()
         self.web_search_tool = WebTrustedSearchTool()
-        # self.web_rag_tool = WebsiteSearchTool()
 
     @agent
     def kb_agent(self) -> Agent:
@@ -105,6 +102,7 @@ class PRFAQGeneratorCrew:
         return Agent(
             config=self.agents_config['content_generation_agent'],
             verbose=True,
+            tools=[self.web_search_tool],  # Use the wrapped tool instance
             llm= get_openai_llm()
         )
 
@@ -113,7 +111,7 @@ class PRFAQGeneratorCrew:
         return Agent(
             config=self.agents_config['faq_generation_agent'],
             verbose=True,
-            # tools=[kb_qdrant_tool],
+            tools=[kb_qdrant_tool],  # Use the wrapped tool instance
             llm= get_openai_llm()
         )
     
@@ -176,7 +174,7 @@ class PRFAQGeneratorCrew:
             refined_query_response = llm.invoke(refine_prompt)
             refined_query = refined_query_response.content.strip()
             
-            web_rag_response = self.web_search_tool.run(query=refined_query)
+            web_rag_response = self.web_search_tool.run(query=refined_query, trust= True)
 
             return {
                 "web_rag_response": web_rag_response
@@ -239,22 +237,25 @@ class PRFAQGeneratorCrew:
     @task
     def content_generation_task(self) -> Task:
         def task_logic(inputs):
-            
-            topic= inputs.get('topic', 'Default Topic'),
-            # context= inputs.get('context', 'Default Context'),
-            problem= inputs.get('problem', 'Default Problem'),
-            solution= inputs.get('solution', 'Default Solution'),
-            # reference_document= inputs.get('extracted_reference_doc_content', ''),
-            # scraped_content= inputs.get('web_scrape_content', 'No scraped content')
+            topic = inputs.get('topic', 'Default Topic')
+            problem = inputs.get('problem', 'Default Problem')
+            solution = inputs.get('solution', 'Default Solution')
+            chat_history = inputs.get('chat_history', [""])
+
+            web_search_result = self.web_search_tool.run(query=search_query, )
 
             agent = self.content_generation_agent()
-            content = agent.execute(task_inputs={"topic":topic, "problem":problem, "solution":solution})
+            content = agent.execute(task_inputs={"topic": topic, "problem": problem, "solution": solution, "chat_history":chat_history})
 
-            return {"generated_content": content}
+            # Step 5: Return the correct output
+            return {
+                "generated_content": content
+            }
 
         return Task(
             config=self.tasks_config['content_generation_task'],
             logic=task_logic,
+            tools=[self.web_search_tool],
             output_pydantic=GeneratedContent,
             context=[self.kb_retrieval_task(), self.web_search_task(), self.web_scrape_extraction_task(), self.extract_info_task()]
         )
@@ -263,6 +264,7 @@ class PRFAQGeneratorCrew:
     def faq_generation_task(self) -> Task:
         def task_logic(inputs):
             topic = inputs.get('topic', 'Default Topic')
+            chat_history = inputs.get('chat_history', [""])
 
             # Generate FAQs using the agent
             faq_agent = self.faq_generation_agent()
@@ -274,16 +276,16 @@ class PRFAQGeneratorCrew:
                 "Subtitle": content_json.get("Subtitle", ""),
                 "IntroParagraph": content_json.get("IntroParagraph", ""),
                 "Solution": content_json.get("Solution", ""),
-                "LeadersQuote": content_json.get("LeadersQuote", ""),
-                "CustomerQuotes": content_json.get("CustomerQuotes", []),
-                "GettingStarted": content_json.get("GettingStarted", ""),
+                "ProblemStatement": content_json.get("ProblemStatement", ""),
+                "Competitors": content_json.get("Competitors", []),
                 "InternalFAQs": json.loads(internal_faqs) if internal_faqs else [],
-                "ExternalFAQs": json.loads(external_faqs) if external_faqs else []
+                "ExternalFAQs": json.loads(external_faqs) if external_faqs else [],
+                "UserResponse": content_json.get("UserResponse", "")
             }
 
         return Task(
             config=self.tasks_config['faq_generation_task'],
-            #tools=[kb_qdrant_tool],
+            tools=[kb_qdrant_tool],
             logic=task_logic,
             output_pydantic=FAQ,
             context=[self.kb_retrieval_task(), self.web_search_task(), self.content_generation_task()]
