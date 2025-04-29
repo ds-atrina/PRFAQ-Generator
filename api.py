@@ -143,7 +143,12 @@ async def generate_prfaq(
     try:
         # Parse body to extract messages
         messages = request.messages
-        if not messages:
+        if messages:
+            try:
+                messages = json.loads(messages)
+            except (json.JSONDecodeError, TypeError):
+                messages = messages if isinstance(messages, list) else []
+        else:
             messages = ["Generate PR/FAQ for me"]
         # Fetch space details
         space = fetch_space_details(x_space_id)
