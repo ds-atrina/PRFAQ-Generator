@@ -1,0 +1,699 @@
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
+import streamlit as st
+import io
+import os
+import sys
+import docx
+import json
+import time
+import openai
+from utils import extract_text_from_pdf, render_text_or_table_to_str
+from langchain_openai import ChatOpenAI  
+from crew import PRFAQGeneratorCrew
+from web_search import WebTrustedSearchTool
+from qdrant_tool import kb_qdrant_tool
+from concurrent.futures import ThreadPoolExecutor
+
+# Ensure `src/` is in the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+
+# Set your OpenAI API key here or use an environment variable
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def display_output(output):
+    """Function to display PR FAQ sections."""
+    pr_faq_str = ""
+    pr_faq_str += f"*{output.get('UserResponse', '')}*\n\n"
+    pr_faq_str += f"**Title:** {output.get('Title', '')}\n\n"
+    pr_faq_str += f"**Subtitle:** {output.get('Subtitle', '')}\n\n"
+    pr_faq_str += f"**Introduction Paragraph:** {output.get('IntroParagraph', '')}\n\n"
+    pr_faq_str += f"**Problem Statement:** {output.get('ProblemStatement', '')}\n\n"
+    pr_faq_str += f"**Solution:** {output.get('Solution', '')}\n\n"
+    pr_faq_str += "**Leader's Quote:** \n\n"
+    pr_faq_str += "**Customer's Quote:** \n\n"
+
+    pr_faq_str += f"\n**Competitors:**\n"
+    for competitor in output.get("Competitors", []):
+        name = competitor.get("name", "")
+        url = competitor.get("url", "")
+        pr_faq_str += f"\n- [{name}]({url})\n"
+
+    pr_faq_str += f"\n**Internal FAQs:**\n"
+    for faq in output.get("InternalFAQs", []):
+        question = faq.get('Question', faq.get('question', 'Unknown Question'))
+        answer = faq.get('Answer', faq.get('answer', 'No answer provided'))
+
+        pr_faq_str += f"\n**Q: {question}**\n"
+        pr_faq_str += f"\nA:\n{render_text_or_table_to_str(answer)}\n"
+
+    pr_faq_str += f"\n**External FAQs:**\n"
+    for faq in output.get("ExternalFAQs", []):
+        question = faq.get('Question', faq.get('question', 'Unknown Question'))
+        answer = faq.get('Answer', faq.get('answer', 'No answer provided'))
+
+        pr_faq_str += f"\n**Q: {question}**\n"
+        pr_faq_str += f"\nA:\n{render_text_or_table_to_str(answer)}\n"
+
+    return pr_faq_str
+
+def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_history):
+    """
+    Chat with LLM to answer user questions or feedback.
+    This function is optimized for performance and generalized for various conversational queries.
+    """
+    # Initialize LLM
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+    # Step 2: Refine the search query
+    refine_prompt = f"""
+        The user provided the following feedback:
+        "{user_feedback}"
+        The current PR FAQ is based on the following context:
+        Topic: {topic}
+        Problem statement: {problem}
+        Solution: {solution}
+
+        Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feedback query around the topic, problem or solution.
+        Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
+        You can consider India for location-specific searches if required unless mentioned otherwise.
+        Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+        Return ONLY the refined search query without any additional text.
+    """
+    refined_query_response = llm.invoke(refine_prompt)
+    refined_query = refined_query_response.content.strip()
+
+    # Step 3: Perform Web Search and Knowledge Base Search in Parallel
+    kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
+    web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
+
+    with ThreadPoolExecutor() as executor:
+        kb_future = executor.submit(kb_tool.run, refined_query)
+        web_future = executor.submit(web_tool.run, query=refined_query, trust=True)
+
+        kb_response = kb_future.result()
+        web_response = web_future.result()
+
+    # Step 4: Use Refined Query and Search Results to Generate a Response
+    prompt = f"""You are an intelligent assistant tasked with responding to user response.
+
+        User response:
+        "{user_feedback}"
+
+        The PR FAQ is generated based on the following:
+        - Topic: {topic}
+        - Problem statement: {problem}
+        - Solution: {solution}
+
+
+        A search was carried out for the feedback with the refined query:
+        "{refined_query}"
+
+        The web search returned the following results:
+        "{web_response}"
+        
+        The knowledge base search returned the following results:
+        "{kb_response}"
+
+        Here is the chat history for context:
+        {json.dumps(chat_history[-6:], indent=4)}
+
+        Answer the user response based on the user feedback and the given context of topic, problem statement and solution, using web search or knowledge base results. 
+        In the case that it is not related to the topic, problem statement or solution, just respond to the user based on what they said. Like responding to thank you with you are welcome and I am here to help you if you need anything and so on.
+        Ensure your reply is consistent with the FAQs, if not, mention that to the user. Answer as if you are answering an FAQ. Do not give lengthy answers, be concise and to the point.
+        Do not answer negatively or vaguely like "I don't know" or "Not specified." 
+        ONLY RETURN THE GENERATED ANSWER, NO EXTRA TEXT. If required, include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points ("\n-") or bold or italics for clarity. 
+        
+        Here is the current PRFAQ for context:
+        "{existing_faq}"
+    """
+    response = llm.invoke(prompt)
+
+    # Step 5: Return the generated response
+    return response.content.strip()
+    
+def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_history):
+    """
+    Modify an existing PR FAQ based on user feedback, chat history, and additional context. 
+    This function uses refined search queries to gather relevant information from web and knowledge base searches.
+    """
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+    # Step 1: Refine search query based on user feedback and context
+    refine_prompt = f"""
+        The user provided the following feedback:
+        "{user_feedback}"
+        The current PR FAQ is based on the following context:
+        Topic: {topic}
+        Problem statement: {problem}
+        Solution: {solution}
+
+        Based on this feedback and the given context of topic, problem statement, solution, and recent chat history, determine the most effective search query to put in a search engine to gather relevant and latest information user feedback query around the topic, problem or solution.
+        Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
+        You can consider India for location-specific searches if required unless mentioned otherwise.
+        Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+        Return ONLY the refined search query without any additional text. 
+    """
+    refined_query_response = llm.invoke(refine_prompt)
+    refined_query = refined_query_response.content.strip()
+
+    # Step 2: Perform Web and Knowledge Base Searches in Parallel
+    kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
+    web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
+
+    with ThreadPoolExecutor() as executor:
+        kb_future = executor.submit(kb_tool.run, refined_query)
+        web_future = executor.submit(web_tool.run, query=refined_query, trust=True)
+
+        kb_response = kb_future.result()
+        web_response = web_future.result()
+
+    # Step 3: Use Refined Query and Search Results to Modify the FAQ
+    prompt = f"""
+        You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
+
+        The PR FAQ is generated based on the following:
+        - Problem statement: {problem}
+        - Solution: {solution}
+
+        User feedback:
+        "{user_feedback}"
+
+        Here is the chat history for context:
+        "{json.dumps(chat_history[-6:], indent=4)}"
+
+        Carefully identify what the user wants to do exactly based on the chat history and current user feedback. 
+        If the request can be handled by the past conversational context, do not use further information to make the modifications.
+        Use the below information, if required, to make appropriate changes in the PR FAQ. 
+
+        A search was carried out for the feedback with the refined query:
+        "{refined_query}"
+
+        The web search returned the following results. Use this information to enhance the FAQ wherever relevant:
+        "{web_response}"
+        
+        The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
+        "{kb_response}"
+
+        Here is the existing PR FAQ:
+        ```{existing_faq}```
+
+        Instructions:
+        - Modify the PR FAQ comprehensively based on the identified goal, ensuring the PR FAQ is consistent throughout. 
+        - Any queries of adding information should be added to the existing PR FAQ in FAQs unless mentioned otherwise by the user, without affecting other sections of the PR FAQ.
+        - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format:
+            Title: str
+            Subtitle: str
+            IntroParagraph: str
+            ProblemStatement: str
+            Solution: str
+            Competitors: list
+            InternalFAQs: list
+            ExternalFAQs: list
+            UserResponse: str
+        - Use information from the search results, knowledge base or chat history to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive responses from the retrieved information.
+        - Ensure that any new information aligns with the problem statement and solution provided.
+        - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
+        - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
+        - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
+        - While generating the FAQs and answers, follow these stylistic and tone guidelines:
+            - Use British English (e.g., "capitalise," "colour").
+            - Keep language human, positive and transparent.
+            - Ensure the tone is formal yet personable, clear, and consistent with brand values.
+            - Avoid technical jargon unless necessary, and explain all abbreviations/acronyms.
+    """
+
+    response = llm.invoke(prompt)
+    response_text = response.content.strip()
+
+    # Step 4: Parse the Response
+    try:
+        response_text = response_text.replace("```json", "").replace("```", "").strip()
+        updated_faq = json.loads(response_text)
+        return updated_faq
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse the updated PR FAQ: {e}")
+        return existing_faq
+    
+MAX_FILES = 5
+MAX_FILE_SIZE_MB = 25
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+MAX_LINKS = 5
+
+def main():
+    st.set_page_config(layout="wide")
+    st.title("PR/FAQ Generator (Beta v2.1)")
+
+    # Store PR FAQ and chat history in session state
+    if "pr_faq" not in st.session_state:
+        st.session_state.pr_faq = None
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    with st.sidebar:
+        with st.expander("How to Use Guide"):
+            st.markdown("""
+                **How to Use**
+
+                - **Fill out the required fields in the sidebar**:
+                    - **Title**: Enter a concise title for your PRFAQ (minimum 3 characters).
+                    - **Problem**: Describe the challenge or issue your solution addresses (minimum 20 characters).
+                    - **Solution**: Explain how your solution resolves the problem (minimum 50 characters).
+                    - **Reference Links**: *Optional* Provide URLs for additional reference material.
+                    - **Upload Reference Documents**: *Optional* Upload PDF or DOCX files for context.
+                    - **Use Web Search**: Turn the switch on to use web search capabilities for generating your PRFAQ using latest and relevant information.
+
+                - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-5 minutes** depending on the complexity of your inputs.)
+
+                - **View Execution Details**: The app will display the generated PRFAQ and the time taken to generate it.
+
+                - **Interact with the Chat**: You can review the PRFAQ once created and provide feedback or additional prompts to refine it.
+                    - **Use @generate**: To regenerate the PR FAQ with modifications.
+                    - **Other Prompts**: Ask questions or provide feedback to get a response from the assistant.
+            """)
+
+        # User Inputs
+        st.header("Inputs")
+
+        topic = st.text_input("Title*", "", placeholder="at least 3 characters", help= "Enter a concise title showcasing the main theme of your content.\ne.g., AI-Powered PRFAQ Generator", label_visibility="visible")
+        problem = st.text_input("Problem*", "", placeholder="at least 20 characters", help= "Describe the issue or challenge that your solution addresses. Provide sufficient detail to clearly convey the problem.\ne.g., Crafting comprehensive PRFAQs is often time-consuming and requires significant effort, leading to delays in product development and communication", label_visibility="visible")
+        solution = st.text_input("Solution*", "", placeholder="at least 50 characters", help= "Explain how your product or service effectively resolves the identified problem. Ensure the description is detailed.\ne.g., Introducing an AI-powered PRFAQ generator that automates the creation of detailed and accurate PRFAQs, streamlining the process and reducing time-to-market",  label_visibility="visible")
+        web_scraping_links = st.text_input("Reference Links (if any)", "", help= "Provide upto 5 comma separated URLs of the webpages that serve as a reference for your content. Ensure the links are valid and accessible")
+        reference_docs = st.file_uploader("Upload Reference Documents (if any)", type=["pdf", "docx"], accept_multiple_files=True, help= "Attach upto 5 PDF or DOCX documents, each may be upto 25 MB, that serve as a reference for your content. This could include reports, whitepapers, or existing PRFAQs")
+        use_websearch = st.toggle("Use Web Search", value=False)
+
+        if st.button("Generate PR FAQ"):
+            if len(topic) < 3:
+                st.error("Title is too short. Please enter at least 3 characters.")
+            # elif len(problem) < 20:
+            #     st.error("Problem is too short. Please enter at least 20 characters.")
+            # elif len(solution) < 50:
+            #     st.error("Solution is too short. Please enter at least 50 characters.")
+            else:
+                # Validate links
+                links_list = [link.strip() for link in web_scraping_links.split(",") if link.strip()]
+                if len(links_list) > MAX_LINKS:
+                    st.error(f"Too many reference links. Max allowed: {MAX_LINKS}")
+                    return
+
+                # Validate file upload
+                if reference_docs and len(reference_docs) > MAX_FILES:
+                    st.error(f"Too many files uploaded. Max allowed: {MAX_FILES}")
+                    return
+
+                oversized_files = [doc.name for doc in reference_docs if doc.size > MAX_FILE_SIZE_BYTES]
+                if oversized_files:
+                    st.error(f"The following files exceed {MAX_FILE_SIZE_MB}MB limit: {', '.join(oversized_files)}")
+                    return
+                
+                with st.spinner('Processing your inputs...'):
+                    start_time = time.perf_counter()
+
+                    reference_doc_content = []
+                    if reference_docs:
+                        for reference_doc in reference_docs:
+                            content = ""
+                            file_extension = os.path.splitext(reference_doc.name)[1].lower()
+                            if file_extension == ".pdf":
+                                content += extract_text_from_pdf(reference_doc)
+                                st.write(f"Reference document {reference_doc.name} read and processed.")
+                            elif file_extension == ".docx":
+                                doc = docx.Document(io.BytesIO(reference_doc.read()))
+                                content += "\n".join([para.text for para in doc.paragraphs])
+                                st.write(f"Reference document {reference_doc.name} read and processed.")
+                            else:
+                                st.error(f"Only PDF and DOCX files are allowed. {reference_doc.name} is not a valid type.")
+                            reference_doc_content.append(content)
+
+                with st.spinner('Generating the PRFAQ for you...'):
+                    # Define inputs for PR FAQ generation
+                    inputs = {
+                        'topic': topic,
+                        'problem': problem,
+                        'solution': solution,
+                        'chat_history': [""],
+                        # 'context': 'This is some default context.',
+                        # 'content': 'This is some default content.',
+                        'reference_doc_content': reference_doc_content,
+                        'web_scraping_links': links_list,
+                        'use_websearch':use_websearch
+                    }
+
+                    # Generate PR FAQ using Crew
+                    pr_faq_crew = PRFAQGeneratorCrew(inputs)
+                    crew_output = pr_faq_crew.crew().kickoff(inputs=inputs)
+                    cleaned_json = crew_output.raw.replace("```json","").replace("```","").strip()
+
+                    try:
+                        parsed_output = json.loads(cleaned_json)
+                        st.session_state.pr_faq = parsed_output  # Store in session
+                        st.success("PR FAQ generated successfully!")
+                        st.session_state.chat_history.append({"role": "assistant", "content": display_output(parsed_output)})
+                    except json.JSONDecodeError as e:
+                        st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e), topic, problem, solution)
+                        
+                end_time = time.perf_counter()
+                execution_time = end_time - start_time
+                st.write(f"It took me {execution_time:.2f} seconds to generate this PR FAQ for you!")
+                print(f"Token Usage: {crew_output.token_usage}")
+    
+    if st.session_state.pr_faq:
+        for message in st.session_state.chat_history:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        # React to user input
+        if prompt := st.chat_input("Use @generate in your query to update your PR/FAQ, else chat with AI:"):
+            st.chat_message("user").markdown(prompt)
+            st.session_state.chat_history.append({"role": "user", "content": prompt})
+            if "@generate" in prompt.lower():
+                with st.spinner('Updating your PRFAQ...'):
+                    # Process feedback or new prompt
+                    new_output = modify_faq(st.session_state.pr_faq, prompt, topic, problem, solution, st.session_state.chat_history)
+                    response = display_output(new_output)
+                    st.session_state.pr_faq = response
+                    
+                    # Display assistant response in chat message container
+                    with st.chat_message("assistant"):
+                        st.markdown(response)
+                    # Add assistant response to chat history
+                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+            else:
+                with st.spinner('Answering your query...'):
+                    # Process feedback or new prompt
+                    new_output = chat_with_llm(st.session_state.pr_faq, prompt, topic, problem, solution, st.session_state.chat_history)
+                    
+                    # Display assistant response in chat message container
+                    with st.chat_message("assistant"):
+                        st.markdown(render_text_or_table_to_str(new_output))
+                    # Add assistant response to chat history
+                    st.session_state.chat_history.append({"role": "assistant", "content": new_output})
+ 
+
+if __name__ == "__main__":
+    main()
+
+
+# import streamlit as st
+# import io
+# import os
+# import sys
+# import docx
+# import json
+# import time
+# import openai
+# from utils import extract_text_from_pdf, render_text_or_table_to_str
+# from langchain_openai import ChatOpenAI
+# from crew import PRFAQGeneratorCrew
+# from searxng_search import SearxNGTrustedSearchTool
+# from qdrant_tool import kb_qdrant_tool
+
+# # Ensure `src/` is in the Python path
+# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+
+# # Set your OpenAI API key here or use an environment variable
+# openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# MAX_FILES = int(os.getenv("MAX_FILES", 5))
+# MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 25))
+# MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+# MAX_LINKS = int(os.getenv("MAX_LINKS", 5))
+
+
+# def display_output(output):
+#     """Function to display PR FAQ sections."""
+#     pr_faq_str = ""
+#     pr_faq_str += f"**Title:** {output.get('Title', '')}\n\n"
+#     pr_faq_str += f"**Subtitle:** {output.get('Subtitle', '')}\n\n"
+#     pr_faq_str += f"**Introduction Paragraph:** {output.get('IntroParagraph', '')}\n\n"
+#     pr_faq_str += f"**Customer Problems:** {output.get('CustomerProblems', '')}\n\n"
+#     pr_faq_str += f"**Solution:** {output.get('Solution', '')}\n\n"
+#     pr_faq_str += f"**Leader's Quote:** {output.get('LeadersQuote', '')}\n\n"
+#     pr_faq_str += f"**Getting Started:** {output.get('GettingStarted', '')}\n\n"
+#     pr_faq_str += f"**Customer Quotes:**\n"
+#     for quote in output.get("CustomerQuotes", []):
+#         pr_faq_str += f"\n*{quote}*\n"
+
+#     pr_faq_str += f"\n**Internal FAQs:**\n"
+#     for faq in output.get("InternalFAQs", []):
+#         question = faq.get('Question', faq.get('question', 'Unknown Question'))
+#         answer = faq.get('Answer', faq.get('answer', 'No answer provided'))
+
+#         pr_faq_str += f"\n**Q: {question}**\n"
+#         pr_faq_str += f"\nA:\n{render_text_or_table_to_str(answer)}\n"
+
+#     pr_faq_str += f"\n**External FAQs:**\n"
+#     for faq in output.get("ExternalFAQs", []):
+#         question = faq.get('Question', faq.get('question', 'Unknown Question'))
+#         answer = faq.get('Answer', faq.get('answer', 'No answer provided'))
+
+#         pr_faq_str += f"\n**Q: {question}**\n"
+#         pr_faq_str += f"\nA:\n{render_text_or_table_to_str(answer)}\n"
+
+#     return pr_faq_str
+
+
+# def refine_and_search(llm, user_feedback, topic, problem, solution, chat_history):
+#     """Refine the query and perform web and KB searches."""
+#     refine_prompt = f"""
+#         The user provided the following feedback:
+#         "{user_feedback}"
+
+#         The current PR FAQ is based on the following context:
+#         Topic: {topic}
+#         Problem statement: {problem}
+#         Solution: {solution}
+
+#         Here is the chat history for context:
+#         {json.dumps(chat_history[-5:], indent=4)}
+
+#         Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
+#         Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
+#         You can consider India for location-specific searches if required unless mentioned otherwise.
+#         Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+#         Return ONLY the refined search query without any additional text. 
+#     """
+        
+#     refined_query_response = llm.invoke(refine_prompt)
+#     refined_query = refined_query_response.content.strip()
+
+#     # Perform Web Search with the Refined Query
+#     try:
+#         kb_response = kb_qdrant_tool.run(refined_query)
+#     except Exception as e:
+#         kb_response = f"Error while searching KB: {str(e)}"
+
+#     try:
+#         web_tool = SearxNGTrustedSearchTool()
+#         web_response = web_tool.run(refined_query)
+#     except Exception as e:
+#         web_response = f"Error while searching web: {str(e)}"
+
+#     return refined_query, kb_response, web_response
+
+
+# def process_feedback(existing_faq, user_feedback, topic, problem, solution, chat_history, modify=False):
+#     llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+#     refined_query, kb_response, web_response = refine_and_search(
+#         llm, user_feedback, topic, problem, solution, chat_history
+#     )
+
+#     if modify:
+#         # Use the refined query and search results to modify the FAQ
+#         prompt = f"""
+#             You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
+
+#             The PR FAQ is generated based on the following:
+#             - Problem statement: {problem}
+#             - Solution: {solution}
+
+#             User feedback:
+#             "{user_feedback}"
+
+#             A search was carried out for the feedback with the refined query:
+#             "{refined_query}"
+
+#             The web search returned the following results. Use this information to enhance the FAQ wherever relevant:
+#             "{web_response}"
+            
+#             The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
+#             "{kb_response}"
+
+#             Instructions:
+#             - Modify the PR FAQ comprehensively based on the user feedback and recent chat history, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the prfaq.
+#             - Use information from the search results or knowledge base to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
+#             - Ensure that any new information aligns with the problem statement and solution provided.
+#             - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
+#             - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
+#             - Assume any new feedback is a FAQ unless specified otherwise.
+#             - DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the updated PR FAQ in STRICT JSON format.
+#             - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
+
+#             Here is the existing PR FAQ:
+#             ```{existing_faq}```
+#         """
+#     else:
+#         # Answer user query
+#         prompt = f"""
+#             You are an intelligent assistant tasked with answering any user question.
+
+#             The PR FAQ is generated based on the following:
+#             - Problem statement: {problem}
+#             - Solution: {solution}
+
+#             User feedback:
+#             "{user_feedback}"
+
+#             A search was carried out for the feedback with the refined query:
+#             "{refined_query}"
+
+#             The web search returned the following results.
+#             "{web_response}"
+            
+#             The knowledge base search returned the following results.
+#             "{kb_response}"
+
+#             Here is the chat history for context:
+#             {json.dumps(chat_history[-5:], indent=4)}
+
+#             Answer the user question based on the user feedback and the given context of topic, problem statement and solution, using web search or knowledge base results. 
+#             Ensure your answer is consistent with the FAQs, if not, mention that to the user. Answer as if you are answering an FAQ. Do not give lengthy answers, be concise, to the point and well-formatted answers.
+#             Do not answer negatively or vaguely like "I don't know" or "Not specified." 
+#             ONLY RETURN THE GENERATED ANSWER, NO EXTRA TEXT. USE PROPER FORMATTING TO DISPLAY THE ANSWER.
+            
+#             Here is the current PRFAQ for context:
+#             "{existing_faq}"
+#         """
+
+#     response = llm.invoke(prompt)
+#     return response.content.strip()
+
+
+# def main():
+#     st.set_page_config(layout="wide")
+#     st.title("PR/FAQ Generator (Beta v2.0)")
+
+#     if "pr_faq" not in st.session_state:
+#         st.session_state.pr_faq = None
+#     if "chat_history" not in st.session_state:
+#         st.session_state.chat_history = []
+
+#     with st.sidebar:
+#         with st.expander("How to Use Guide"):
+#             st.markdown("""
+#                 **How to Use**
+
+#                 - **Fill out the required fields in the sidebar**:
+#                     - **Title**: Enter a concise title for your PRFAQ (minimum 3 characters).
+#                     - **Problem**: Describe the challenge or issue your solution addresses (minimum 20 characters).
+#                     - **Solution**: Explain how your solution resolves the problem (minimum 50 characters).
+#                     - **Reference Links**: *Optional* Provide URLs for additional reference material.
+#                     - **Upload Reference Documents**: *Optional* Upload PDF or DOCX files for context.
+#                     - **Use Web Search**: Turn the switch on to use web search capabilities for generating your PRFAQ using latest and relevant information.
+
+#                 - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-5 minutes** depending on the complexity of your inputs.)
+
+#                 - **View Execution Details**: The app will display the generated PRFAQ and the time taken to generate it.
+
+#                 - **Interact with the Chat**: You can review the PRFAQ once created and provide feedback or additional prompts to refine it.
+#                     - **Use @generate**: To regenerate the PR FAQ with modifications.
+#                     - **Other Prompts**: Ask questions or provide feedback to get a response from the assistant.
+#             """)
+#         topic = st.text_input("Title*", "")
+#         problem = st.text_input("Problem*", "")
+#         solution = st.text_input("Solution*", "")
+#         web_scraping_links = st.text_input("Reference Links (if any)", "")
+#         reference_docs = st.file_uploader(
+#             "Upload Reference Documents (if any)", type=["pdf", "docx"], accept_multiple_files=True
+#         )
+#         use_websearch = st.toggle("Use Web Search", value=False)
+
+#         if st.button("Generate PR FAQ"):
+#             # Validate inputs
+#             if len(topic) < 3:
+#                 st.error("Title is too short.")
+#                 return
+#             # if len(problem) < 20:
+#             #     st.error("Problem is too short.")
+#             #     return
+#             # if len(solution) < 50:
+#             #     st.error("Solution is too short.")
+#             #     return
+
+#             # Process reference documents
+#             reference_doc_content = []
+#             for doc in reference_docs:
+#                 if doc.size > MAX_FILE_SIZE_BYTES:
+#                     st.error(f"File {doc.name} exceeds size limit.")
+#                     return
+#                 if doc.name.endswith(".pdf"):
+#                     reference_doc_content.append(extract_text_from_pdf(doc))
+#                 elif doc.name.endswith(".docx"):
+#                     doc_content = docx.Document(io.BytesIO(doc.read()))
+#                     reference_doc_content.append("\n".join([para.text for para in doc_content.paragraphs]))
+
+#             # Generate FAQ
+#             inputs = {
+#                 "topic": topic,
+#                 "problem": problem,
+#                 "solution": solution,
+#                 "reference_doc_content": reference_doc_content,
+#                 "web_scraping_links": web_scraping_links.split(","),
+#                 "use_websearch": use_websearch,
+#             }
+#             crew = PRFAQGeneratorCrew(inputs)
+#             try:
+#                 result = crew.crew().kickoff(inputs=inputs)
+#                 parsed_output = json.loads(result.raw)
+#                 st.session_state.pr_faq = parsed_output
+#                 st.session_state.chat_history.append({"role": "assistant", "content": display_output(parsed_output)})
+#                 st.success("PR FAQ generated successfully!")
+#             except Exception as e:
+#                 st.error(f"Error generating PR FAQ: {e}")
+
+#     if st.session_state.pr_faq:
+#         for message in st.session_state.chat_history:
+#             with st.chat_message(message["role"]):
+#                 st.markdown(message["content"])
+
+#         if prompt := st.chat_input("Type your query or use @generate for updates:"):
+#             st.chat_message("user").markdown(prompt)
+#             st.session_state.chat_history.append({"role": "user", "content": prompt})
+
+#             if "@generate" in prompt.lower():
+#                 with st.spinner("Updating PR FAQ..."):
+#                     response = process_feedback(
+#                         st.session_state.pr_faq,
+#                         prompt,
+#                         topic,
+#                         problem,
+#                         solution,
+#                         st.session_state.chat_history,
+#                         modify=True,
+#                     )
+#                     try:
+#                         updated_faq = json.loads(response)
+#                         st.session_state.pr_faq = updated_faq
+#                         st.session_state.chat_history.append({"role": "assistant", "content": display_output(updated_faq)})
+#                     except json.JSONDecodeError:
+#                         st.error("Failed to process the updated PR FAQ.")
+#             else:
+#                 with st.spinner("Answering your query..."):
+#                     response = process_feedback(
+#                         st.session_state.pr_faq,
+#                         prompt,
+#                         topic,
+#                         problem,
+#                         solution,
+#                         st.session_state.chat_history,
+#                         modify=False,
+#                     )
+#                     st.session_state.chat_history.append({"role": "assistant", "content": response})
+#                     st.chat_message("assistant").markdown(response)
+
+
+# if __name__ == "__main__":
+#     main()
