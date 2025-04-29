@@ -7,7 +7,7 @@ langchain-community
 crewai-tools   #crewai-tools==0.13.4
 python-docx
 qdrant-client
-pysqlite3-binary
-setuptools
+# pysqlite3-binary
+# setuptools
 supabase
 postgrest

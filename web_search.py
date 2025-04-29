@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 from crewai.tools import BaseTool
+from openai import OpenAI
 from pydantic import BaseModel, Field
 from typing import Type, List, Dict, Any
 import requests
@@ -10,8 +11,10 @@ import time
 from langchain_openai import ChatOpenAI
 from urllib.parse import urlencode, urlparse
 from whitelisted_sites import whitelisted_domain_list
+import os
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 class WebSearchQuerySchema(BaseModel):
     query: str = Field(..., description="Search query to find relevant information.")

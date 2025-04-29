@@ -1,6 +1,6 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import io
@@ -10,15 +10,19 @@ import docx
 import json
 import time
 import openai
+from openai import OpenAI
 from utils import extract_text_from_pdf, render_text_or_table_to_str
 from langchain_openai import ChatOpenAI  
 from crew import PRFAQGeneratorCrew
 from web_search import WebTrustedSearchTool
 from qdrant_tool import kb_qdrant_tool
+from dotenv import load_dotenv
+load_dotenv()
 
 # Ensure `src/` is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Set your OpenAI API key here or use an environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -59,7 +63,7 @@ def display_output(output):
     return pr_faq_str
     
 def modify_faq(existing_faq, user_feedback, topic, problem, solution):
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
     refine_prompt = f"""
         The user provided the following feedback:
         "{user_feedback}"

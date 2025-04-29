@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+from openai import OpenAI
 from langchain_openai import ChatOpenAI
 from typing import Dict, Any
 from crewai import Agent, Crew, Process, Task
@@ -15,6 +16,8 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -146,7 +149,7 @@ class PRFAQGeneratorCrew:
             problem = inputs.get("problem", "Default Problem")
             solution = inputs.get("solution", "Default Solution")
 
-            llm = ChatOpenAI(model="gpt-4o", temperature=0)
+            llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
             refine_prompt = f"""
                 You are tasked with generating a highly effective web search query to support the creation of a PR FAQ document.
 

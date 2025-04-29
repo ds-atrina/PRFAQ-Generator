@@ -4,7 +4,8 @@ import asyncio
 import re
 import pandas as pd
 from crewai import LLM
-
+from dotenv import load_dotenv
+load_dotenv()
 def extract_text_from_pdf(pdf_file) -> str:
     """Extract text from a PDF file using PyMuPDF (fitz)."""
     try:
