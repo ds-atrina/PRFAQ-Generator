@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
 from postgrest import APIError
 import os
 import json
-
+from dotenv import load_dotenv
+load_dotenv()
 from crew import PRFAQGeneratorCrew
 
 # Load environment variables (e.g., Supabase credentials)
@@ -13,7 +15,13 @@ load_dotenv()
 
 # Initialize FastAPI
 app = FastAPI(title="PRFAQ Generator API")
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Supabase client initialization
 from supabase import create_client
 

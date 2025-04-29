@@ -12,4 +12,4 @@ COPY . /app
 
 EXPOSE 8082
 
-CMD ["python", "main.py"]
+ENTRYPOINT ["python", "api-db.py"]

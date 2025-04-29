@@ -16,6 +16,8 @@ from langchain_openai import ChatOpenAI
 from crew import PRFAQGeneratorCrew
 from searxng_search import SearxNGTrustedSearchTool
 from qdrant_tool import kb_qdrant_tool
+from dotenv import load_dotenv
+load_dotenv()
 
 # Ensure `src/` is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
