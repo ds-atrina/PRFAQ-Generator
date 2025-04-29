@@ -135,7 +135,7 @@ async def generate_prfaq(
     x_space_id: str = Header(..., alias="x-space-id", description="Space ID for which the PR FAQ needs to be generated"),
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id", description="Thread ID for tracking the request"),
     x_command: Optional[str] = Header(None, alias="x-command", description="Command in use"),
-    x_web_search: Optional[bool] = Header(False, alias="x-web-search", description="Boolean flag to use web search")
+    x_web_search: Optional[str] = Header("false", alias="x-web-search", description="Boolean flag to use web search")
 ):
     """
     Generate a PR FAQ for a given spaceid by fetching data from the Supabase database.
@@ -163,7 +163,7 @@ async def generate_prfaq(
             "chat_history": messages, 
             "web_scraping_links": links,
             "reference_doc_content": reference_content,
-            "use_websearch": x_web_search  # Convert string to boolean
+            "use_websearch": x_web_search.lower() == "true",  # Convert string to boolean
         }
 
         # Instantiate and kickoff the PR FAQ generation
