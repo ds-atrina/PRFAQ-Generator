@@ -34,9 +34,8 @@ class Request(BaseModel):
     messages: list
 
 class ModifyRequest(BaseModel):
-    messages: list
-    existing_faq: str
-    user_feedback: str
+    messages: List[str]
+    currentPrFAQ: str
 
 # Pydantic models for request and response validation
 class PRFAQResponse(BaseModel):
@@ -201,6 +200,7 @@ async def modify_faq(
     request: ModifyRequest,
     x_space_id: str = Header(..., alias="x-space-id", description="Space ID for which the modification is being performed"),
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id", description="Thread ID for tracking the request"),
+    x_command: Optional[str] = Header(None, alias="x-command", description="Command in use"),
     x_web_search: Optional[str] = Header("False", alias="x-web-search", description="Boolean flag to use web search")
 ):
     """
@@ -208,13 +208,11 @@ async def modify_faq(
     """
     try:
         # Extract inputs from the request
-        existing_faq = request.existing_faq
-        user_feedback = request.user_feedback
         messages = request.messages
-        if not messages:
-            messages = ["Generate PR/FAQ for me"]
+        current_prfaq = request.currentPrFAQ
 
-        space = fetch_space_details(x_space_id)
+        # Fetch space details
+        space = fetch_space_details(x_space_id)  # Assuming this function is defined elsewhere
         title = space["title"]
         solution = space["details"].get("solution", "")
         problem_statement = space["details"].get("problemStatement", "")
@@ -224,18 +222,13 @@ async def modify_faq(
 
         # Refine the search query based on user feedback
         refine_prompt = f"""
-            The user provided the following feedback:
-            "{user_feedback}"
-            The current PR FAQ is based on the following context:
-            Topic: {topic}
-            Problem statement: {problem}
+            Based on the user feedback and the given context of topic, problem statement, and solution:
+            Topic: {title}
+            Problem statement: {problem_statement}
             Solution: {solution}
 
-            - Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
-            - Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
-            - You can consider India for location-specific searches if required unless mentioned otherwise.
-            - Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
-            - Return ONLY the refined search query without any additional text.         
+            Determine the most effective search query to gather relevant and latest information. Be general, avoid specific product details, and avoid proper nouns and dates.
+            Return ONLY the refined search query without any additional text.
         """
         refined_query_response = llm.invoke(refine_prompt)
         refined_query = refined_query_response.content.strip()
@@ -256,11 +249,11 @@ async def modify_faq(
             You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
 
             The PR FAQ is generated based on the following:
-            - Problem statement: {problem}
+            - Problem statement: {problem_statement}
             - Solution: {solution}
 
             User feedback:
-            "{user_feedback}"
+            "{messages[-1]}"
 
             A search was carried out for the feedback with the refined query:
             "{refined_query}"
@@ -271,15 +264,21 @@ async def modify_faq(
             The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
             "{kb_response}"
 
+            Here is the existing PR FAQ in markdown format:
+            ```{current_prfaq}```
+
+            Chat history for context:
+            ```{messages}```
+
             Instructions:
-            - Modify the PR FAQ comprehensively based on the user feedback, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the PR FAQ.
+            - Modify the PR FAQ comprehensively based on the user feedback, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the prfaq.
             - Change the UserResponse field according to the user's feedback. It should be a reply to the user's message.
-            - Use information from the search results or knowledge base to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
+            - Use information from the search results, knowledge base or chat history to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
             - Ensure that any new information aligns with the problem statement and solution provided.
             - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
             - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
             - Assume any new feedback is a FAQ unless specified otherwise.
-            - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format:
+            - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format: Use double quotes to wrap keys and values.
                 Title: str
                 Subtitle: str
                 IntroParagraph: str
@@ -289,6 +288,45 @@ async def modify_faq(
                 InternalFAQs: list
                 ExternalFAQs: list
                 UserResponse: str
+            eg. {{
+                    "Title": "Revolutionizing AI Assistants",
+                    "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
+                    "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
+                    "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
+                    "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+                    "InternalFAQs": [
+                        {{
+                            "Question": "How does the AI assistant integrate with existing tools?",
+                            "Answer": "It seamlessly integrates with platforms like \n-Slack \n-Microsoft Teams \n-CRM systems via APIs."
+                        }},
+                        {{
+                            "Question": "What kind of training data is required?",
+                            "Answer": "The AI assistant can be **fine-tuned** with company-specific data for enhanced performance."
+                        }}
+                    ],
+                    "ExternalFAQs": [
+                        {{
+                            "Question": "Is the AI assistant secure?",
+                            "Answer": "Yes, we use industry-standard encryption and compliance measures to ensure data security."
+                        }},
+                        {{
+                            "Question": "Can the AI assistant handle multiple languages?",
+                            "Answer": "Absolutely! It's developed in a way that supports multiple languages and can be customized based on user needs."
+                        }},
+                        {{
+                            "Question": "Can I use Markdown-style tables?",
+                            "Answer": "| Feature         | Benefit        |\n|------------------|----------------|\n| Auto-Generate    | Saves time     |\n| LLM-Driven       | Context aware  |"
+                        }},
+                        {{
+                            "Question": "Can I also return JSON-style tables?",
+                            "Answer": [
+                                {{"Input Type": "Markdown Table", "Support": "Yes"}},
+                                {{"Input Type": "JSON Table", "Support": "Yes"}}
+                            ]
+                        }}
+                    ],
+                    "UserResponse": "Here is the generated PR/FAQ document on topic and your provided inputs. Please review and let me know if any changes are needed."
+                }}
             - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
             - While generating the FAQs and answers, follow these stylistic and tone guidelines:
                 - Use British English (e.g., "capitalise," "colour").
@@ -296,33 +334,26 @@ async def modify_faq(
                 - Ensure the tone is formal yet personable, clear, and consistent with brand values.
                 - Avoid technical jargon unless necessary, and explain all abbreviations/acronyms.
 
-            Here is the existing PR FAQ in markdown string format:
-            ```{existing_faq}```
         """
         response = llm.invoke(prompt)
-        response_text = response.content.strip()
+        response_text = str(response.content.strip())
 
-        # Parse and return the updated FAQ
-        
-        cleaned_json = result.raw.replace("```json", "").replace("```", "").strip()
-        parsed_output = json.loads(cleaned_json)
-        markdown = format_output(parsed_output)
-        user_response = parsed_output.get("UserResponse", "Here's the modified document for you:")
+        # Parse the response
+        try:
+            cleaned_json = response_text.replace("```json", "").replace("```", "").strip()
+            parsed_output = json.loads(cleaned_json)
+            markdown = format_output(parsed_output)
+            user_response = parsed_output.get("UserResponse", "Here's the modified document according to your request:")
+            return {"markdown_output": updated_faq, "response_to_user": user_response}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse the updated PR FAQ: {e}")
 
-        return {
-            "markdown_output": markdown,
-            "response_to_user": user_response
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
     except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=f"Resource not found: {e}")
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"A runtime error occurred: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
-
 
 if __name__ == "__main__":
     import uvicorn

@@ -115,7 +115,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
         - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
         - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
         - Assume any new feedback is a FAQ unless specified otherwise.
-        - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format:
+        - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format: Use double quotes to wrap keys and values.
             Title: str
             Subtitle: str
             IntroParagraph: str
@@ -125,6 +125,45 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
             InternalFAQs: list
             ExternalFAQs: list
             UserResponse: str
+        eg. {{
+                "Title": "Revolutionizing AI Assistants",
+                "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
+                "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
+                "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
+                "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+                "InternalFAQs": [
+                    {{
+                        "Question": "How does the AI assistant integrate with existing tools?",
+                        "Answer": "It seamlessly integrates with platforms like \n-Slack \n-Microsoft Teams \n-CRM systems via APIs."
+                    }},
+                    {{
+                        "Question": "What kind of training data is required?",
+                        "Answer": "The AI assistant can be **fine-tuned** with company-specific data for enhanced performance."
+                    }}
+                ],
+                "ExternalFAQs": [
+                    {{
+                        "Question": "Is the AI assistant secure?",
+                        "Answer": "Yes, we use industry-standard encryption and compliance measures to ensure data security."
+                    }},
+                    {{
+                        "Question": "Can the AI assistant handle multiple languages?",
+                        "Answer": "Absolutely! It's developed in a way that supports multiple languages and can be customized based on user needs."
+                    }},
+                    {{
+                        "Question": "Can I use Markdown-style tables?",
+                        "Answer": "| Feature         | Benefit        |\n|------------------|----------------|\n| Auto-Generate    | Saves time     |\n| LLM-Driven       | Context aware  |"
+                    }},
+                    {{
+                        "Question": "Can I also return JSON-style tables?",
+                        "Answer": [
+                            {{"Input Type": "Markdown Table", "Support": "Yes"}},
+                            {{"Input Type": "JSON Table", "Support": "Yes"}}
+                        ]
+                    }}
+                ],
+                "UserResponse": "Here is the generated PR/FAQ document on topic and your provided inputs. Please review and let me know if any changes are needed."
+            }}
         - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
         - While generating the FAQs and answers, follow these stylistic and tone guidelines:
             - Use British English (e.g., "capitalise," "colour").
@@ -157,7 +196,7 @@ MAX_LINKS = 5
 
 def main():
     st.set_page_config(layout="wide")
-    st.title("PR/FAQ Generator (Beta v2.0)")
+    st.title("PR/FAQ Generator (Beta v2.1)")
 
     # Store PR FAQ and chat history in session state
     if "pr_faq" not in st.session_state:
