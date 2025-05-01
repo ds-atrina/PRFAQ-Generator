@@ -149,7 +149,6 @@ faq_generation_task:
     Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
 
     **Follow this Guidance (STRICT)**:
-    - Use bullet points directly using "\n-"
     - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table", "Example of Markdown table".
     - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
     **Ensure the above rules are strictly followed without exception.**
