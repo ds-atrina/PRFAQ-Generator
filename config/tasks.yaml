@@ -148,8 +148,8 @@ faq_generation_task:
     THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. 
     Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
 
-    **Follow this Guidance (STRICT)**:
-    - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table", "Example of Markdown table".
+    **FOLLOW THESE RULES STRICTLY WHILE ANSWERING EACH QUESTION**:
+    - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table:", "Example of Markdown table:", "A markdown formatted table illustrates this:" or any similar wording.
     - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
     **Ensure the above rules are strictly followed without exception.**
 
