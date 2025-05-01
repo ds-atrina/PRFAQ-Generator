@@ -19,7 +19,6 @@ def tool(name: str):
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 qdrant_url = os.environ.get("QDRANT_URL")
-
 connection = QdrantClient(url=qdrant_url)
 
 @tool("Answer Q&A from Finance Knowledgebase")
@@ -33,7 +32,7 @@ def qdrant_tool(question: str) -> str:
     embedding = response.data[0].embedding
 
     search_result = connection.query_points(
-        collection_name="1finance_kb_test",
+        collection_name="1finance_kb_department",
         query=embedding,
         limit=10,
         with_payload=True

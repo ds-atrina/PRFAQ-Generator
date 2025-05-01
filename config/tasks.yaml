@@ -2,10 +2,18 @@ kb_retrieval_task:
   description: >
     Retrieve ALL relevant information from the knowledge base for the given query: 
     "Retrieve all information about {topic}. The problem is: {problem}. The proposed solution is: {solution}."
-    Focus on providing detailed, structured, and accurate responses that align with 1 Finance's past products, policies, strategies, or other relevant company information.
+    Your response must include:
+    1. Detailed, structured, and accurate information related to the topic, problem, and proposed solution — strictly aligned with 1 Finance's past or current products, features, policies, strategies or other relevant company information.
+    2. Department-Level Insight:
+    - Identify all departments that are or would be involved based on the topic, problem, and solution.
+    - Retrieve relevant knowledge about how these departments operate (processes, tools, responsibilities).
+    - Explain how each department contributes, supports, or is impacted by the solution.
+    - Show inter-departmental alignment or dependencies where applicable.
+
+    Focus on providing detailed, structured, and accurate responses that align with 1 Finance's internal knowledge and practices.
     Return empty if no relevant content is found, **DO NOT USE INFORMATION FROM OTHER TASKS. DO NOT MAKE UP INFORMATION.**
   expected_output: >
-    A structured JSON object containing the retrieved information from the knowledge base.
+    A structured JSON object containing the retrieved information from the knowledge base, including department alignment if applicable.
   agent: kb_agent
   
 web_search_task:
@@ -90,8 +98,8 @@ content_generation_task:
       "Title": "1 FINANCE ANNOUNCES XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
       "Subtitle": "The subtitle reframes the headline solution. Write one sentence about the benefits.",
       "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
-      "ProblemStatement": "2-4 sentences describing the problems this product plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
-      "Solution": "2-4 sentences describing how the new product addresses these problems. For more complex products, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
+      "ProblemStatement": "3-4 sentences describing the problems this product/feature plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
+      "Solution": "2-4 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
       "Competitors": "[{{"name": "Company name or Product name", "url":"URL of the product website"}}]" [LIST OF JSON]
     }}
   expected_output: >
@@ -100,11 +108,12 @@ content_generation_task:
 
 faq_generation_task:
   description: >
-    Take a moment to think about all possible questions that can be asked about this offering or topic.
+    Take a moment to think about all possible questions that can be asked about this offering or ```{topic}```.
     Use information from {chat_history} to make any necessary updates with the latest information.
     USE THE OUTPUT OF kb_retrieval_task to answer questions. Only if the relevant information is not available from the available knowledge base information, use the generated content to answer them.
+
     Based on the generated PR FAQ introduction, create a comprehensive FAQ document divided into two categories:
-       1.**Internal FAQs**: (17-20 questions) focusing on:
+       1.**Internal FAQs**: (18-20 questions) focusing on:
         - Business rationale and market need
         - Product vision and alignment with company strategy
         - Technical approach, risks, and scalability
@@ -113,13 +122,13 @@ faq_generation_task:
         - Resourcing, timeline, and launch readiness
         - Success metrics and future roadmap
 
-       2.**External FAQs**: (17-20 questions) focusing on:
+       2.**External FAQs**: (18-20 questions) focusing on:
         - What the product is and what problems it solves
         - Who it's for and how it's used
         - Pricing, availability, and onboarding process
         - Key features and known limitations
         - Security, privacy, and data handling
-        - Support, integrations, and future updates
+        - Support and future updates
     
     Read the last user message in {chat_history}, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
 
@@ -128,17 +137,22 @@ faq_generation_task:
     1. **First**, use relevant information from the Knowledge Base `kb_qdrant_tool` and the output of kb_retrieval_task. These should be the Primary sources for answering the question.
     2. **Second**, if no suitable answer exists in the Knowledge Base, use output of web_search_task to construct the response.
     3. **Third**, only if neither the Knowledge Base nor Web Search provides an answer, generate original content independently — ensuring strict factual accuracy, based only on verified information.
-
     UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
-   
-    Ensure each FAQ question and answer covers a **distinct and meaningful** topic.
+
+    **Important Points to Remember**
     - **Do not** repeat the same ideas in slightly different wording.
-    - **Do not** introduce redundant, overlapping, or unnecessarily similar questions.
-    - Aim for maximum breadth, depth, and non-repetition across all FAQs.
+    - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
 
     Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, ProblemStatement, Solution) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
     You may ask a few relevant questions based on web search results too in order the enhance the FAQs and make them more recent or specific. Avoid numbering the questions in the FAQs.
-    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. 
+    Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+
+    **Follow this Guidance (STRICT)**:
+    - Use bullet points directly using "\n-"
+    - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table", "Example of Markdown table".
+    - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
+    **Ensure the above rules are strictly followed without exception.**
 
   expected_output: >
     A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using proper markdown-formatted tables, sub-points, bold or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
@@ -148,6 +162,16 @@ faq_generation_task:
       "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
       "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
       "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+      "Competitors": [
+        {
+          "name":"Amazon Rekognition", 
+          "url":"https://docs.aws.amazon.com/rekognition/"
+        }, 
+        {
+          "name":"Google Cloud Vision API", 
+          "url":"https://cloud.google.com/vision/docs/detecting-safe-search"
+        }
+      ],
       "InternalFAQs": [
           {{
               "Question": "How does the AI assistant integrate with existing tools?",
@@ -172,7 +196,7 @@ faq_generation_task:
               "Answer": "| Feature         | Benefit        |\n|------------------|----------------|\n| Auto-Generate    | Saves time     |\n| LLM-Driven       | Context aware  |"
           }},
           {{
-              "Question": "Can I also return JSON-style tables?",
+              "Question": "Can you find its competitor and return the output in table form?",
               "Answer": [
                 {{"Input Type": "Markdown Table", "Support": "Yes"}},
                 {{"Input Type": "JSON Table", "Support": "Yes"}}
