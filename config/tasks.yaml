@@ -99,7 +99,7 @@ content_generation_task:
       "Subtitle": "The subtitle reframes the headline solution. Write one sentence about the benefits.",
       "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
       "ProblemStatement": "3-4 sentences describing the problems this product/feature plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
-      "Solution": "2-4 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
+      "Solution": "3-5 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
       "Competitors": "[{{"name": "Company name or Product name", "url":"URL of the product website"}}]" [LIST OF JSON]
     }}
   expected_output: >
@@ -110,7 +110,13 @@ faq_generation_task:
   description: >
     Take a moment to think about all possible questions that can be asked about this offering or ```{topic}```.
     Use information from {chat_history} to make any necessary updates with the latest information.
-    USE THE OUTPUT OF kb_retrieval_task to answer questions. Only if the relevant information is not available from the available knowledge base information, use the generated content to answer them.
+
+    Important Prioritisation for Answering Each Question:
+    - Always follow this strict order of sourcing:
+    1. **First**, use relevant information from the Knowledge Base `kb_qdrant_tool` and the output of kb_retrieval_task. These should be the Primary sources for answering the question.
+    2. **Second**, also make sure to use the output of web_search_task to construct the response.
+    3. **Third**, only if neither the Knowledge Base nor Web Search provides an answer, generate original content independently — ensuring strict factual accuracy, based only on verified information.
+    UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
 
     Based on the generated PR FAQ introduction, create a comprehensive FAQ document divided into two categories:
        1.**Internal FAQs**: (18-20 questions) focusing on:
@@ -132,23 +138,16 @@ faq_generation_task:
     
     Read the last user message in {chat_history}, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
 
-    Important Prioritisation for Answering Each Question:
-    - Always follow this strict order of sourcing:
-    1. **First**, use relevant information from the Knowledge Base `kb_qdrant_tool` and the output of kb_retrieval_task. These should be the Primary sources for answering the question.
-    2. **Second**, if no suitable answer exists in the Knowledge Base, use output of web_search_task to construct the response.
-    3. **Third**, only if neither the Knowledge Base nor Web Search provides an answer, generate original content independently — ensuring strict factual accuracy, based only on verified information.
-    UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
-
-    **Important Points to Remember**
-    - **Do not** repeat the same ideas in slightly different wording.
-    - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
+    **Important Considerations to be followed STRICTLY:**
+      - THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE EXTREMELY DETAILED, ALL-INFORMING AND WELL-FORMATTED.
+      - Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+      - **Do not** repeat the same ideas in slightly different wording.
+      - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
 
     Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, ProblemStatement, Solution) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
     You may ask a few relevant questions based on web search results too in order the enhance the FAQs and make them more recent or specific. Avoid numbering the questions in the FAQs.
-    THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE **EXTREMELY DETAILED**, ALL-INFORMING AND WELL-FORMATTED. 
-    Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
-
-    **FOLLOW THESE RULES STRICTLY WHILE ANSWERING EACH QUESTION**:
+    
+    **Formatting Guidelines:**:
     - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table:", "Example of Markdown table:", "A markdown formatted table illustrates this:" or any similar wording.
     - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
     **Ensure the above rules are strictly followed without exception.**
