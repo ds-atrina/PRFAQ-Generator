@@ -9,6 +9,10 @@ import json
 from dotenv import load_dotenv
 load_dotenv()
 from crew import PRFAQGeneratorCrew
+from web_search import WebTrustedSearchTool
+from qdrant_tool import kb_qdrant_tool
+from concurrent.futures import ThreadPoolExecutor
+from langchain_openai import ChatOpenAI  
 
 # Load environment variables (e.g., Supabase credentials)
 load_dotenv()
@@ -34,7 +38,7 @@ class Request(BaseModel):
     messages: list
 
 class ModifyRequest(BaseModel):
-    messages: List[str]
+    messages: List
     currentPrFAQ: str
 
 # Pydantic models for request and response validation
@@ -133,7 +137,7 @@ def fetch_space_documents(spaceid: str, chatid: Optional[str]):
 
     return merged_content.strip()
 
-@app.post("/generate_prfaq", response_model=PRFAQResponse)
+@app.post("/generate-prfaq", response_model=PRFAQResponse)
 async def generate_prfaq(
     request: Request,
     x_space_id: str = Header(..., alias="x-space-id", description="Space ID for which the PR FAQ needs to be generated"),
@@ -195,7 +199,7 @@ async def generate_prfaq(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 
-@app.post("/modify_faq", response_model=PRFAQResponse)
+@app.post("/modify-prfaq", response_model=PRFAQResponse)
 async def modify_faq(
     request: ModifyRequest,
     x_space_id: str = Header(..., alias="x-space-id", description="Space ID for which the modification is being performed"),
@@ -344,7 +348,7 @@ async def modify_faq(
             parsed_output = json.loads(cleaned_json)
             markdown = format_output(parsed_output)
             user_response = parsed_output.get("UserResponse", "Here's the modified document according to your request:")
-            return {"markdown_output": updated_faq, "response_to_user": user_response}
+            return {"markdown_output": markdown, "response_to_user": user_response}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to parse the updated PR FAQ: {e}")
 
