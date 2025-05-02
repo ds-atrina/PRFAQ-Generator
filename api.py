@@ -2,7 +2,10 @@ from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI  
+from web_search import WebTrustedSearchTool
+from concurrent.futures import ThreadPoolExecutor
+from qdrant_tool import kb_qdrant_tool
 from postgrest import APIError
 import os
 import json
@@ -56,6 +59,12 @@ def format_output(output):
     pr_faq_str += f"**Solution:** {output.get('Solution', '')}\n\n"
     pr_faq_str += "**Leader's Quote:** \n\n"
     pr_faq_str += "**Customer's Quote:** \n\n"
+
+    pr_faq_str += f"\n**Competitors:**\n"
+    for competitor in output.get("Competitors", []):
+        name = competitor.get("name", "")
+        url = competitor.get("url", "")
+        pr_faq_str += f"\n- [{name}]({url})\n"
 
     pr_faq_str += f"\n**Internal FAQs:**\n"
     for faq in output.get("InternalFAQs", []):
