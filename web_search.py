@@ -10,8 +10,11 @@ import time
 from langchain_openai import ChatOpenAI
 from urllib.parse import urlencode, urlparse
 from whitelisted_sites import whitelisted_domain_list
+from dotenv import load_dotenv
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+load_dotenv() 
+
+llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 class WebSearchQuerySchema(BaseModel):
     query: str = Field(..., description="Search query to find relevant information.")
