@@ -1,6 +1,6 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import io
@@ -73,23 +73,25 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
         Solution: {solution}
 
         - Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
-        - Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
+        - Create a search query that balances specificity and breadth: it should aim to gather **detailed, structured information** that can answer the user feedback precisely (for example, cost breakdowns, competitor feature tables, regional insights), while also being broad enough to capture related insights.
         - You can consider India for location-specific searches if required unless mentioned otherwise.
         - Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
-        - Return ONLY the refined search query without any additional text.         
+        - Prioritise Indian market context by default unless stated otherwise.
+        - If the query involves costing or pricing, explicitly add "India" and "cost breakdown" or "pricing table" in the search query.
+        - Return ONLY the refined search query as a string without any additional text.         
     """
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
 
     # Perform Web Search with the Refined Query
     kb_tool = kb_qdrant_tool
-    kb_response = kb_qdrant_tool.run(refined_query)
+    kb_response = kb_qdrant_tool.run(question=refined_query, top_k=10)
     web_tool = WebTrustedSearchTool()
-    web_response = web_tool.run(query=refined_query, trust=True)
+    web_response = web_tool.run(query=refined_query, trust=True, read_content=True, top_k=20)
 
     # Use the refined query and web results to modify the FAQ
     prompt = f"""
-        You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
+        You are an intelligent assistant working at 1Finance tasked with modifying an existing PR FAQ based on user feedback.
 
         The PR FAQ is generated based on the following:
         - Problem statement: {problem}
@@ -112,8 +114,9 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
         - Change the UserResponse field according to the user's feedback. It should be a reply to the user's message.
         - Use information from the search results or knowledge base to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
         - Ensure that any new information aligns with the problem statement and solution provided.
-        - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
-        - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
+        - [STRICT] Whenever the user feedback requests a table, ensure that the response **must include a well-formatted markdown table.** If the retrieved information lacks a table, extract the relevant data points and **format them into a table yourself.**
+        - For cost/pricing-related feedback, always assume the country context is India (unless otherwise stated) and provide costs in INR. Avoid using USD or other currencies unless specified.
+        - Prioritise Indian market context by default unless the user specifies otherwise.
         - Assume any new feedback is a FAQ unless specified otherwise.
         - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format: Use double quotes to wrap keys and values.
             Title: str
@@ -131,6 +134,16 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution):
                 "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
                 "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
                 "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+                "Competitors": [
+                    {{
+                    "name":"Amazon Rekognition", 
+                    "url":"https://docs.aws.amazon.com/rekognition/"
+                    }}, 
+                    {{
+                    "name":"Google Cloud Vision API", 
+                    "url":"https://cloud.google.com/vision/docs/detecting-safe-search"
+                    }}
+                ],
                 "InternalFAQs": [
                     {{
                         "Question": "How does the AI assistant integrate with existing tools?",
@@ -196,7 +209,7 @@ MAX_LINKS = 5
 
 def main():
     st.set_page_config(layout="wide")
-    st.title("PR/FAQ Generator (Beta v2.1)")
+    st.title("PR/FAQ Generator (Beta v3.0)")
 
     # Store PR FAQ and chat history in session state
     if "pr_faq" not in st.session_state:
@@ -217,7 +230,7 @@ def main():
                     - **Upload Reference Documents**: *Optional* Upload PDF or DOCX files for context.
                     - **Use Web Search**: Turn the switch on to use web search capabilities for generating your PRFAQ using latest and relevant information.
 
-                - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-5 minutes** depending on the complexity of your inputs.)
+                - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-10 minutes** depending on the complexity of your inputs.)
 
                 - **View Execution Details**: The app will display the generated PRFAQ and the time taken to generate it.
 

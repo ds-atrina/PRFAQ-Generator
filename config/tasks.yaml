@@ -15,61 +15,7 @@ kb_retrieval_task:
   expected_output: >
     A structured JSON object containing the retrieved information from the knowledge base, including department alignment if applicable.
   agent: kb_agent
-  
-web_search_task:
-  description: >
-    Use the following workflow to gather relevant and credible information for a given query:
-    1. Start with the provided query and analyze its context:
-      - Understand the query's focus, such as the topic, problem, or solution it relates to.
-      - Identify domains most likely to provide high-quality, accurate information for the query context. Examples:
-        - For financial tools, consider domains about compliance, taxation, or financial regulation.
-        - For security or document storage solutions, consider domains related to cybersecurity, cloud storage, or data protection.
-        - For lending or fintech products, consider sources covering peer-to-peer finance, lending norms, or fintech industry news.
-
-    2. Use an LLM to refine the query and generate an optimized search string sround the problem statement and solution, market trends, competitors, and other relevant aspects:
-      - Avoid using specific names, brands, or years unless explicitly necessary.
-      - Use generic yet comprehensive terms (e.g., "benefits", "trends", "impact") to ensure broad coverage.
-      - Assume India as the default region unless stated otherwise.
-
-    3. Determine the most relevant domains using an LLM and the query context:
-      - Select up to 3 domains from a trusted, predefined list of whitelisted sources.
-      - Include an empty string in the domain list to allow for general searches alongside domain-scoped searches.
-
-    4. Execute web searches using the web search tool for each domain:
-      - Format the search as "site:domain refined_query" for domain-specific queries.
-      - Use engines such as Google, Brave, DuckDuckGo, and Bing.
-
-    5. Retrieve and curate results:
-      - Extract title, URL, content snippet, and full article content (from <article> tags when available).
-      - Clean and structure results for easy consumption.
-      - Filter out low-value or broken pages, prioritizing high-quality content.
-
-    6. Score and sort results:
-      - Use relevance, content quality, and context alignment as scoring criteria.
-      - Fetch and process article tags for the top 5 results to extract detailed content insights.
-      - Include fallback notes if no results are found in trusted domains.
-
-    7. Return a curated list of results:
-      - Include a structured summary with trusted sources and general web insights.
-      - Provide actionable recommendations based on findings.
-
-  expected_output: >
-    
-    A detailed, multi-source research summary that includes:
-    - Key insights extracted from the specified trusted websites (cite the source for each insight).
-    - Any additional supporting information from general web searches, clearly distinguished from official sources.
-    - A final analysis that synthesizes the findings and provides actionable insights regarding the product context, topic, problem, and solution.
-
-    A summary should be structured into sections:
-    - **Trusted Sources Insights**: Findings from official and trusted domains.
-    - **General Web Insights**: Supplementary information from broader web searches.
-    - **Final Analysis**: A synthesized view of all findings with actionable recommendations.
-
-    The summary should be actionable, highlighting key takeaways and insights relevant to the query context.
-    Ensure that trusted sources are prioritized and clearly distinguish between official and general insights.
-
-  agent: web_search_agent
-
+ 
 web_scrape_extraction_task:
   description: >
     Visit and scrape content from the given links: ```{web_scraping_links}``` using the Web Scraping Tool.
@@ -91,8 +37,8 @@ extract_info_task:
 
 content_generation_task:
   description: >
-    Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt, the knowledge base information received from the {chat_history}, the output of kb_retrieval_task and web search output of web_search_task.
-    USE THE WEB SEARCH TOOL TO SEARCH FOR COMPETITORS WHO ARE TRYING TO SOLVE THE SAME {problem}, THE COMPANY/PRODUCT NAME AND THE COMPANY/PRODUCT URL AND SET TRUST TO FALSE.
+    Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt, the knowledge base information received from the {chat_history} and the output of kb_retrieval_task.
+    USE THE WEB SEARCH TOOL TO SEARCH FOR COMPETITORS WHO ARE TRYING TO SOLVE THE SAME {problem}, THE COMPANY/PRODUCT NAME AND THE COMPANY/PRODUCT URL AND SET TRUST AND READ_CONTENT TO FALSE AND TOP_K TO 20.
     Follow the exact JSON template below, using placeholders for any specific dates, names, or locations:
     {{
       "Title": "1 FINANCE ANNOUNCES XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
@@ -100,35 +46,34 @@ content_generation_task:
       "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
       "ProblemStatement": "3-4 sentences describing the problems this product/feature plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
       "Solution": "3-5 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
-      "Competitors": "[{{"name": "Company name or Product name", "url":"URL of the product website"}}]" [LIST OF JSON]
+      "Competitors": [{{"name": "Company name or Product name", "url":"URL of the product website"}}] [LIST OF JSON]
     }}
   expected_output: >
     A JSON object strictly following the provided template with all required sections using information from reference document and scraped web page.
   agent: content_generation_agent
 
-faq_generation_task:
+generate_faq_questions_task:
   description: >
-    Take a moment to think about all possible questions that can be asked about this offering or ```{topic}```.
+    Take a moment to think about all possible questions that can be asked about this offering the details of which are as follows:
+      Topic/Title: {topic}
+      Problem Statement: {problem}
+      Solution: {solution}
+
     Use information from {chat_history} to make any necessary updates with the latest information.
-
-    Important Prioritisation for Answering Each Question:
-    - Always follow this strict order of sourcing:
-    1. **First**, use relevant information from the Knowledge Base `kb_qdrant_tool` and the output of kb_retrieval_task. These should be the Primary sources for answering the question.
-    2. **Second**, also make sure to use the output of web_search_task to construct the response.
-    3. **Third**, only if neither the Knowledge Base nor Web Search provides an answer, generate original content independently — ensuring strict factual accuracy, based only on verified information.
-    UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
-
-    Based on the generated PR FAQ introduction, create a comprehensive FAQ document divided into two categories:
-       1.**Internal FAQs**: (18-20 questions) focusing on:
+    Generate two exhaustive lists of questions: Internal and External FAQs for the product described in the chat history.
+    The questions should be framed in a way that they can be answered by the same question by the sources without any bias.
+    
+    Based on the generated PR FAQ introduction, create a comprehensive list of questions divided into two categories:
+       1.**Internal FAQs**: (10-12 questions) focusing on:
         - Business rationale and market need
         - Product vision and alignment with company strategy
         - Technical approach, risks, and scalability
-        - Internal roles, stakeholders, and dependencies
+        - Internal roles, stakeholders, and dependencies according to 1 Finance's departments (do not name the departments in the questions)
         - Legal, compliance, and privacy concerns
         - Resourcing, timeline, and launch readiness
         - Success metrics and future roadmap
 
-       2.**External FAQs**: (18-20 questions) focusing on:
+       2.**External FAQs**: (10-12 questions) focusing on:
         - What the product is and what problems it solves
         - Who it's for and how it's used
         - Pricing, availability, and onboarding process
@@ -139,7 +84,62 @@ faq_generation_task:
     Read the last user message in {chat_history}, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
 
     **Important Considerations to be followed STRICTLY:**
-      - THE QUESTIONS SHOULD BE EXHAUSTIVE AND ANSWERS SHOULD BE EXTREMELY DETAILED, ALL-INFORMING AND WELL-FORMATTED.
+      - THE QUESTIONS SHOULD BE EXHAUSTIVE.
+      - Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+      - **Do not** repeat the same ideas in slightly different wording.
+      - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
+
+    Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, ProblemStatement, Solution) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
+    You may ask a few relevant questions based on web search results too in order the enhance the FAQs and make them more recent or specific. Avoid numbering the questions in the FAQs.
+    
+    **Formatting Guidelines:**:
+    - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table:", "Example of Markdown table:", "A markdown formatted table illustrates this:" or any similar wording.
+    - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
+    **Ensure the above rules are strictly followed without exception.**
+  
+    Chat History: {chat_history}
+
+    STRICT RULES:
+    - NO overlapping, duplicate, or semantically similar questions.
+    - Exhaustive coverage without repetition.
+    - Format output as JSON with "internal_questions" and "external_questions" as two arrays of strings.
+
+  expected_output: >
+    {{
+      "internal_questions": [
+        "How does this product align with our Q4 strategic goals?",
+        ...
+      ],
+      "external_questions": [
+        "How can users get started with the new AI assistant?",
+        ...
+      ]
+    }}
+  agent: faq_question_generator
+
+answer_faqs_with_context_task:
+  description: >
+    Answer each question from the dictionary with internal and external as keys for the list of questions which are needed to be answered using the tool `ContextFusionTool` to retrieve relevant info from internal KB and the web (if use_websearch set to True), framing it properly with proper formatting.
+    In the case where the information is present in the {chat_history}, use that information according to the context given in that conversation with the user.
+    If a quesion does not have an answer in the knowledge base or web, use the output from the web scrape extraction task and the extract info task to answer the question.
+    The last resort should be using the generated content to frame an answer that is consistent with the other content of the PR/FAQ.
+
+    Content Generation Inputs: output of content_generation_agent
+    Questions JSON: output of faq_question_generator
+
+    Important Prioritisation for Answering Each Question:
+      - Always follow this strict order of sourcing:
+        1. **First**, use relevant information from the Knowledge Base. This should be the Primary sources for answering the question.
+        2. **Second**, if the quesion requires latest or non-1 Finance related information, use the output of Web Search to construct the response. This will only happen if use_websearch was set to True by the user.
+        3. **Third**,  You can also use the output of extract_info_task and/or the output of web_scrape_extraction_task to answer the question.
+        4. **Finally**, if no proper answer was found in any of these sources, generate original content independently — ensuring strict factual accuracy and consistency with the remaining output, based only on verified information.
+    
+    ANSWERS SHOULD BE EXTREMELY DETAILED, ALL-INFORMING AND WELL-FORMATTED. USE THESE SOURCES IN THIS ORDER TO GENERATE ACCURATE ANSWERS. IT IS POSSIBLE THAT AN ANSWER IS PRESENT IN MULTIPLE SOURCES, SO FRAME THE ANSWERS PROPERLY ACCORDING TO THE CONTEXT OF THE QUESTION.
+    UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
+    Read the last user message in {chat_history}, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
+
+    **Important Considerations to be followed STRICTLY:**
+      - THE QUESTIONS SHOULD BE EXHAUSTIVE.
       - Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
       - **Do not** repeat the same ideas in slightly different wording.
       - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
@@ -152,7 +152,11 @@ faq_generation_task:
     - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
     **Ensure the above rules are strictly followed without exception.**
 
+    Final Output:
+    Combine content_generation_json + the two sets of answers (internal + external) into the following JSON structure:
+
   expected_output: >
+    The complete structured JSON object following the below format. DO NOT add extra fields or change key names.
     A complete JSON object containing the PR FAQ introduction along with two arrays—InternalFAQs and ExternalFAQs—each populated with an exhaustive list of questions and detailed, well-formatted answers using proper markdown-formatted tables, sub-points, bold or italics wherever necessary. Do not give simple one sentence answers. The JSON format should be:
     {{
       "Title": "Revolutionizing AI Assistants",
@@ -190,19 +194,18 @@ faq_generation_task:
               "Answer": "Absolutely! It's developed in a way that supports multiple languages and can be customized based on user needs."
           }},
           {{
-              "Question": "Can I use Markdown-style tables?",
+              "Question": "What the features and their corresponding benefits of the product?",
               "Answer": "| Feature         | Benefit        |\n|------------------|----------------|\n| Auto-Generate    | Saves time     |\n| LLM-Driven       | Context aware  |"
           }},
           {{
-              "Question": "Can you find its competitor and return the output in table form?",
+              "Question": "Name the competitors and compare it with our product in table form.",
               "Answer": [
-                {{"Input Type": "Markdown Table", "Support": "Yes"}},
-                {{"Input Type": "JSON Table", "Support": "Yes"}}
+                {{"Name": "Markdown Table", "Feature": "Yes"}},
+                {{"Name": "JSON Table", "Feature": "Yes"}}
               ]
           }}
       ],
       "UserResponse": "Here is the generated PR/FAQ document on topic and your provided inputs. Please review and let me know if any changes are needed."
     }}
     THE OUTPUT SHOULD BE STRICTLY IN JSON.
-  agent: faq_generation_agent
-  
+  agent: faq_answer_agent

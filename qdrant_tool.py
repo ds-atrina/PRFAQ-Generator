@@ -22,7 +22,7 @@ qdrant_url = os.environ.get("QDRANT_URL")
 connection = QdrantClient(url=qdrant_url)
 
 @tool("Answer Q&A from Finance Knowledgebase")
-def qdrant_tool(question: str) -> str:
+def qdrant_tool(question: str, top_k:int) -> str:
     """Useful to answer questions based on the 1Finance PDF knowledge base."""
 
     response = client.embeddings.create(
@@ -34,7 +34,7 @@ def qdrant_tool(question: str) -> str:
     search_result = connection.query_points(
         collection_name="1finance_kb_department",
         query=embedding,
-        limit=10,
+        limit=top_k,
         with_payload=True
     )
 
@@ -44,8 +44,8 @@ class QdrantTool(BaseTool):
     def __init__(self):
         super().__init__(name="QdrantTool", description="A tool for querying the 1Finance knowledge base.")
 
-    def _run(self, question: str) -> str:
-        return qdrant_tool(question)
+    def _run(self, question: str, top_k:int) -> str:
+        return qdrant_tool(question, top_k)
 
     def _arun(self, *args, **kwargs):
         raise NotImplementedError("Async execution is not supported for this tool.")

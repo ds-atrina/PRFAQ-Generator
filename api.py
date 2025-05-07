@@ -12,10 +12,6 @@ import json
 from dotenv import load_dotenv
 load_dotenv()
 from crew import PRFAQGeneratorCrew
-from web_search import WebTrustedSearchTool
-from qdrant_tool import kb_qdrant_tool
-from concurrent.futures import ThreadPoolExecutor
-from langchain_openai import ChatOpenAI  
 
 # Load environment variables (e.g., Supabase credentials)
 load_dotenv()
@@ -249,17 +245,17 @@ async def modify_faq(
         # Perform Web Search and Knowledge Base Search
         kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
         web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
-
+        web_response = "Web search disabled"
         with ThreadPoolExecutor() as executor:
-            kb_future = executor.submit(kb_tool.run, refined_query)
-            web_future = executor.submit(web_tool.run, query=refined_query, trust=True)
-
+            kb_future = executor.submit(kb_tool.run, refined_query, 10)
             kb_response = kb_future.result()
-            web_response = web_future.result()
+            if x_web_search:
+                web_future = executor.submit(web_tool.run, query=refined_query, trust=True, read_content=True, top_k=20)
+                web_response = web_future.result()
 
         # Modify the FAQ using the refined query and search results
         prompt = f"""
-            You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
+            You are an intelligent assistant tasked with modifying/updating an existing PR FAQ based on user feedback and returning it in the said JSON format.
 
             The PR FAQ is generated based on the following:
             - Problem statement: {problem_statement}
@@ -297,9 +293,9 @@ async def modify_faq(
                 IntroParagraph: str
                 ProblemStatement: str
                 Solution: str
-                Competitors: list
-                InternalFAQs: list
-                ExternalFAQs: list
+                Competitors: list (list of dicts with name and url)
+                InternalFAQs: list (list of dicts with Question and Answer)
+                ExternalFAQs: list (list of dicts with Question and Answer)
                 UserResponse: str
             eg. {{
                     "Title": "Revolutionizing AI Assistants",
@@ -307,6 +303,16 @@ async def modify_faq(
                     "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
                     "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
                     "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+                    "Competitors": [
+                        {{
+                        "name":"Amazon Rekognition", 
+                        "url":"https://docs.aws.amazon.com/rekognition/"
+                        }}, 
+                        {{
+                        "name":"Google Cloud Vision API", 
+                        "url":"https://cloud.google.com/vision/docs/detecting-safe-search"
+                        }}
+                    ],
                     "InternalFAQs": [
                         {{
                             "Question": "How does the AI assistant integrate with existing tools?",
@@ -347,10 +353,12 @@ async def modify_faq(
                 - Ensure the tone is formal yet personable, clear, and consistent with brand values.
                 - Avoid technical jargon unless necessary, and explain all abbreviations/acronyms.
 
+            Here is the existing PR FAQ in markdown format:
+            ```{current_prfaq}```
         """
         response = llm.invoke(prompt)
         response_text = str(response.content.strip())
-
+        # print(response_text)
         # Parse the response
         try:
             cleaned_json = response_text.replace("```json", "").replace("```", "").strip()

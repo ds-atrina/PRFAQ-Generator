@@ -19,6 +19,8 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI
 class WebSearchQuerySchema(BaseModel):
     query: str = Field(..., description="Search query to find relevant information.")
     trust: bool = Field(True, description="Whether to search on trusted sites more.")
+    read_content: bool = Field(False, description="Whether to read top sites' article content or not.")
+    top_k: int = Field(20, description="Number of top results to fetch from the search engine.")
 
 class WebTrustedSearchTool(BaseTool):
     name: str = "Web Trusted Search Tool"
@@ -143,18 +145,6 @@ class WebTrustedSearchTool(BaseTool):
                 selected.append(domain)
 
         return selected
-    
-    def is_quality_content(self, text: str) -> bool:
-        words = text.split()
-        sentences = text.split(".")
-        avg_words_per_sentence = len(words) / len(sentences) if sentences else 0
-        return (
-            len(words) > 50
-            and len(sentences) > 3
-            and 5 < avg_words_per_sentence < 30
-            and "crawling error" not in text.lower()
-            and "error fetching content" not in text.lower()
-        )
 
     def calculate_relevance_score(self, result: Dict[str, Any], query: str) -> int:
         try:
@@ -203,7 +193,7 @@ class WebTrustedSearchTool(BaseTool):
                 domain = parsed_url.netloc.lower()
                 for whitelisted_domain in whitelisted_domain_list:
                     if whitelisted_domain in domain:
-                        score += 40
+                        score += 30
                         break
 
             return score
@@ -225,7 +215,7 @@ class WebTrustedSearchTool(BaseTool):
                 })
         return results
 
-    def _run(self, query: str, trust:bool) -> Dict[str, Any]:
+    def _run(self, query: str, trust:bool, read_content:bool, top_k:int) -> Dict[str, Any]:
         """Search Brave Search with a freeform query and fetch content from top 5 sites."""
         brave_instance = "https://api.search.brave.com"
         selected_domains=[]
@@ -292,8 +282,7 @@ class WebTrustedSearchTool(BaseTool):
                     # })
                     break
 
-        MAX_RESULTS = 20
-        if len(results) > MAX_RESULTS:
+        if len(results) > top_k:
             filtered = [r for r in results if 'content' in r]
             scored = [
                 {
@@ -301,7 +290,7 @@ class WebTrustedSearchTool(BaseTool):
                     "score": self.calculate_relevance_score(r, r.get("search_query", ""))
                 } for r in filtered
             ]
-            scored_results = sorted(scored, key=lambda x: x['score'], reverse=True)[:MAX_RESULTS]
+            
         else:
             filtered = [r for r in results if 'content' in r]
             scored = [
@@ -310,8 +299,9 @@ class WebTrustedSearchTool(BaseTool):
                     "score": self.calculate_relevance_score(r, r.get("search_query", ""))
                 } for r in filtered
             ]
-            scored_results = results
-        if trust:
+        scored_results = sorted(scored, key=lambda x: x['score'], reverse=True)[:top_k]
+
+        if read_content:
             # Fetch article content for top 5 results
             processed_count = 0
             for result in scored_results:

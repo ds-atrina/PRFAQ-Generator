@@ -94,5 +94,14 @@ whitelisted_domain_list = [
     "tradestat.commerce.gov.in",
     "apmiindia.org",
     "data.rbi.org.in",
-    "indiapassivefunds.com"
+    "indiapassivefunds.com",
+    "1finance.co.in",
+    "indiamacroindicators.co.in",
+    "indiacryptoresearch.co.in",
+    "planmytax.ai",
+    "1financep2p.com",
+    "1financemagazine.com",
+    "gfpsummit.com",
+    "fintegritystories.com",
+    "indiahrconclave.com"
 ]
