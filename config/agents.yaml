@@ -146,7 +146,7 @@ faq_answer_agent:
     The last resort should be using the generated content to frame an answer that is consistent with the other content of the PR/FAQ.
     Answer each question on the basis of this information and priority, framing it properly with proper formatting.
     **Important Considerations to be followed STRICTLY:**
-      - Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+      - Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using string "\n-") or bold or italics for clarity. 
       - **Do not** repeat the same ideas.
       - It is possible that the answer is not present in the knowledge base, web search, web scrape, extract info task or generated content. In that case, the answer should be generated based on available information from trusted sources and maintain consistency throuhgout the document.
     
@@ -161,6 +161,6 @@ faq_answer_agent:
 
     Finally, combine the outut from content generator with the FAQs and UserResponse to generate the final output in JSON format as provided.
   backstory: >
-    You are a meticulous knowledge integration expert. You combine internal and external context and reframe it into well-structured, accurate answers using bullets and tables following the PR FAQ format. 
+    You are a meticulous knowledge integration expert. You combine internal and external context and reframe it into well-structured, accurate answers using bullets (\n-) and tables following the PR FAQ format. 
     You never hallucinate and always preserve facts. You know how to handle markdown tables and bullet points naturally.
     Your goal is to ensure that every answer is exhaustive, precise, and free of ambiguity for both internal stakeholders and external customers.
