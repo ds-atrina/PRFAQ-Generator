@@ -46,7 +46,7 @@ content_generation_task:
       "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
       "ProblemStatement": "3-4 sentences describing the problems this product/feature plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
       "Solution": "3-5 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
-      "Competitors": [{{"name": "Company name or Product name", "url":"URL of the product website"}}] [LIST OF JSON]
+      "Competitors": [{{"name": "Company name or Product name", "url":"URL of the product website"}}] [LIST OF GENUINE COMPANIES JSON]
     }}
   expected_output: >
     A JSON object strictly following the provided template with all required sections using information from reference document and scraped web page.
@@ -54,14 +54,17 @@ content_generation_task:
 
 generate_faq_questions_task:
   description: >
-    Take a moment to think about all possible questions that can be asked about this offering the details of which are as follows:
-      Topic/Title: {topic}
-      Problem Statement: {problem}
-      Solution: {solution}
+    Take a moment to think about all possible questions that can be asked about this offering the details of which are as follows:      
+      USE THE PROBLEMSTATEMENT AND SOLUTION for {topic} FROM THE CONTENT GENERATION TASK TO FORMULATE QUESTIONS.
 
     Use information from {chat_history} to make any necessary updates with the latest information.
     Generate two exhaustive lists of questions: Internal and External FAQs for the product described in the chat history.
     The questions should be framed in a way that they can be answered by the same question by the sources without any bias.
+    
+    To generate more relevant and specific questions use the following information in order of importance:
+      1. Use the problem statement and solution from the output of content_generation_agent and the context from user chat history ```{chat_history}``` to generate relevant questions. 
+      2. Use the information from the output of kb_agent.
+      3. Use the information from the output of web_scrape_extractor and the output of extract_info_agent.
     
     Based on the generated PR FAQ introduction, create a comprehensive list of questions divided into two categories:
        1.**Internal FAQs**: (10-12 questions) focusing on:
@@ -80,8 +83,7 @@ generate_faq_questions_task:
         - Key features and known limitations
         - Security, privacy, and data handling
         - Support and future updates
-    
-    Read the last user message in {chat_history}, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
+    Read the last user message from the above provided given chat history, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
 
     **Important Considerations to be followed STRICTLY:**
       - THE QUESTIONS SHOULD BE EXHAUSTIVE.
@@ -117,9 +119,82 @@ generate_faq_questions_task:
     }}
   agent: faq_question_generator
 
+# answer_faqs_with_context_task:
+#   description: >
+#     Answer each question in the supplied dictionary using the ContextFusionTool, Chat History ```{chat_history}```, web_scrape_extractor, and extract_info_agent outputs **in exactly this order of priority**:  
+#       1. Knowledge Base  (use all relevant information to the question available in the knowledge base context to answer the question)
+#       2. Web Search (only if {use_websearch} is true)  
+#       3. extract_info_task and/or web_scrape_extraction_task  
+#       4. Original content (strictly fact-checked and consistent)  
+
+#     Formatting & style requirements (all mandatory):  
+#       • Employ bullet lists (using "\n-"), italics, bold, and markdown-formatted tables where they improve clarity or where necessary.  
+#       • Each sentence must be specific to its question—no generic, reusable phrasing.  
+#       • Do **not** label your formatting (e.g., never write “markdown table”, “bullet points”, or “example”).  
+#       • Ban buzzwords such as “state-of-the-art”, “leverage”, “cutting-edge”.  
+#       • Do not repeat ideas.  
+#       • Maintain British spelling.  
+#       • **Never** invent information.
+
+#     When chat_history already contains an answer, prefer and adapt that content.  
+#     You may add a handful of pertinent, up-to-date questions if web findings reveal obvious gaps.
+
+#     After answering, merge the content_generation_agent output (Title, Subtitle, IntroParagraph, ProblemStatement, Solution) with the FAQs into the final JSON schema illustrated below.
+
+#   expected_output: >
+#     A single, fully populated JSON object with these keys **only**:
+
+#     {{
+#       "Title": "Revolutionizing AI Assistants",
+#       "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
+#       "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
+#       "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
+#       "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+#       "Competitors": [
+#         {
+#           "name":"Amazon Rekognition", 
+#           "url":"https://docs.aws.amazon.com/rekognition/"
+#         }, 
+#         {
+#           "name":"Google Cloud Vision API", 
+#           "url":"https://cloud.google.com/vision/docs/detecting-safe-search"
+#         }
+#       ],
+#       "InternalFAQs": [
+#           {{
+#               "Question": "How does the AI assistant integrate with existing tools?",
+#               "Answer": "It seamlessly integrates with platforms like \n- Slack \n- Microsoft Teams \n- CRM systems via APIs."
+#           }},
+#           {{
+#               "Question": "What kind of training data is required?",
+#               "Answer": "The AI assistant can be **fine-tuned** with company-specific data for enhanced performance."
+#           }}
+#       ],
+#       "ExternalFAQs": [
+#           {{
+#               "Question": "Is the AI assistant secure?",
+#               "Answer": "In order to ensure data security we use:\n- End-to-end encryption \n- Regular security audits \n- Compliance with GDPR and CCPA."
+#           }},
+#           {{
+#               "Question": "What the features and their corresponding benefits of the product?",
+#               "Answer": "| Feature         | Benefit        |\n|------------------|----------------|\n| Auto-Generate    | Saves time     |\n| LLM-Driven       | Context aware  |"
+#           }},
+#           {{
+#               "Question": "Name the competitors and compare it with our product in table form.",
+#               "Answer": [
+#                 {{"Name": "Markdown Table", "Feature": "Yes"}},
+#                 {{"Name": "JSON Table", "Feature": "Yes"}}
+#               ]
+#           }}
+#       ],
+#       "UserResponse": "Here is the generated PR/FAQ document on topic and your provided inputs. Please review and let me know if any changes are needed."
+#     }}
+
+#   agent: faq_answer_agent
+
 answer_faqs_with_context_task:
   description: >
-    Answer each question from the dictionary with internal and external as keys for the list of questions which are needed to be answered using the tool `ContextFusionTool` to retrieve relevant info from internal KB and the web (if use_websearch set to True), framing it properly with proper formatting.
+    Answer each question from the dictionary with internal and external as keys for the list of questions which are needed to be answered using the tool `ContextFusionTool` to retrieve relevant info from internal KB and the web (pass internal questions, external questions, {use_websearch} in use_websearch and {topic} as parameters), framing it properly with proper formatting.
     In the case where the information is present in the {chat_history}, use that information according to the context given in that conversation with the user.
     If a quesion does not have an answer in the knowledge base or web, use the output from the web scrape extraction task and the extract info task to answer the question.
     The last resort should be using the generated content to frame an answer that is consistent with the other content of the PR/FAQ.
@@ -139,19 +214,17 @@ answer_faqs_with_context_task:
     Read the last user message in {chat_history}, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
 
     **Important Considerations to be followed STRICTLY:**
-      - THE QUESTIONS SHOULD BE EXHAUSTIVE.
       - Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+      - Answer the question with specific, unique, and non-interchangeable sentences. Avoid generic or modular statements that could fit into other unrelated answers. Every sentence must be tightly connected to the context of this question only.
+      - Answer the question clearly and precisely. Strictly avoid using jargon or generic phrases like 'state-of-the-art', 'leverage', 'cutting-edge', or any similar buzzwords. Use simple, specific language grounded in the actual context.
+      - Do not include any of the following words in the answer or any headings: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
       - **Do not** repeat the same ideas in slightly different wording.
-      - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
+
+    **Ensure the above rules are strictly followed without exception.**
 
     Combine the output of content_generation_task (which includes Title, Subtitle, IntroParagraph, ProblemStatement, Solution) with the FAQs (InternalFAQs, ExternalFAQs - both in Question and Answer format into a single, properly formatted JSON object.  
     You may ask a few relevant questions based on web search results too in order the enhance the FAQs and make them more recent or specific. Avoid numbering the questions in the FAQs.
     
-    **Formatting Guidelines:**:
-    - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table:", "Example of Markdown table:", "A markdown formatted table illustrates this:" or any similar wording.
-    - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
-    **Ensure the above rules are strictly followed without exception.**
-
     Final Output:
     Combine content_generation_json + the two sets of answers (internal + external) into the following JSON structure:
 
@@ -187,11 +260,7 @@ answer_faqs_with_context_task:
       "ExternalFAQs": [
           {{
               "Question": "Is the AI assistant secure?",
-              "Answer": "Yes, we use industry-standard encryption and compliance measures to ensure data security."
-          }},
-          {{
-              "Question": "Can the AI assistant handle multiple languages?",
-              "Answer": "Absolutely! It's developed in a way that supports multiple languages and can be customized based on user needs."
+              "Answer": "In order to ensure data security we use:\n- End-to-end encryption \n- Regular security audits \n- Compliance with GDPR and CCPA."
           }},
           {{
               "Question": "What the features and their corresponding benefits of the product?",

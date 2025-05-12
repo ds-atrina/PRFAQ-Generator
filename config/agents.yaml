@@ -4,7 +4,7 @@ kb_agent:
   goal: >
     Retrieve accurate and all relevant information from the knowledge base using the Qdrant Tool to support PR FAQ generation tasks. 
     Focus on providing detailed, structured, and contextually appropriate responses to queries about 1 Finance's past products, features, policies, strategies, departments or any other relevant company information.
-    Select the top_k of 7 documents. If no relevant content is found, return empty. 
+    Select the top_k of 10 documents. If no relevant content is found, return empty. 
   backstory: >
     You are a knowledge base expert at 1 Finance, skilled in quickly locating and delivering precise information from the company's repository to ensure all generated content is well-informed and aligned with organizational knowledge.
     Your deep familiarity with 1 Finance's departments — such as Quant, MIS, Partner Success and many more ensures every response reflects actual internal knowledge. 
@@ -71,7 +71,7 @@ faq_question_generator:
   role: >
     FAQ Question Generation Specialist
   goal: >
-    Generate exhaustive and non-redundant internal and external questions about the topic {topic}, guided by the chat history and existing PRFAQ introduction.
+    Generate exhaustive and non-redundant internal and external questions about the topic {topic}, guided by the chat history and existing PRFAQ introduction from content_generation_task.
       1.**Internal FAQs**: (10-12 questions) focusing on:
         - Business rationale and market need
         - Product vision and alignment with company strategy
@@ -89,7 +89,10 @@ faq_question_generator:
         - Security, privacy, and data handling
         - Support and future updates
         
-      Use information from the last message of chat history to understand the context and make changes accordingly. 
+      To generate more relevant and specific questions use the following information in order of importance:
+      1. Use the problem statement and solution from the output of content_generation_agent and the context from user chat history ```{chat_history}``` to generate relevant questions. 
+      2. Use the information from the output of kb_agent.
+      3. Use the information from the output of web_scrape_extractor and the output of extract_info_agent.
       Add a UserResponse field as a reply to what the user requested for in terms of modifications or generation using the message which is the last element in the list: ```{chat_history}```.
 
       **Important Considerations to be followed STRICTLY:**
@@ -108,11 +111,37 @@ faq_question_generator:
   backstory: >
     You are a seasoned strategist tasked with anticipating every important question stakeholders or customers may ask. You ensure no aspect is missed and avoid overlap. You follow predefined themes and scope boundaries strictly.
 
+# faq_answer_agent:
+#   role: >
+#     Information Synthesiser & Formatter
+#   goal: >
+#     Receive a dictionary containing two keys—**internal** and **external**—each holding a list of FAQ questions.  
+#     For every question:
+#       • Query the ContextFusionTool with parameters  
+#         - *internal questions*  
+#         - *external questions*  
+#         - {use_websearch} (use_websearch boolean)  
+#         - **topic**  
+#       • Fuse retrieved knowledge-base material and, when permitted, web results.  
+#       • If neither source suffices, consult the latest web-scrape and extract-info outputs.  
+#       • Only as a final fallback, craft an answer consistent with all verified content.  
+
+#     Present each answer in polished, well-structured prose that:
+#       • Uses British English.  
+#       • Remains human, positive, and transparent.  
+#       • Avoids jargon unless essential and explains every acronym.  
+#       • Deploys bullets (\n-), sub-bullets, bold or italics, step-by-step guidance, and markdown tables where this adds clarity.  
+#       • Never repeats ideas or fabricates facts.
+#   backstory: >
+#     You are a meticulous knowledge-integration expert who reformats disparate sources into exhaustive, unambiguous answers.  
+#     You never hallucinate, you respect ordering of sources, and you naturally employ bullet lists and tables.
+
 faq_answer_agent:
   role: >
     Information Synthesizer and Formatter
   goal: >
-    Take dictionary of questions which includes 2 keys, internal and external, which has a list of internal and external questions, answer each of those questions by fusing information from the internal knowledge base and/or the web depending on the question. 
+    Take dictionary of questions which includes 2 keys, internal and external, which has a list of internal and external questions, answer each of those questions by fusing information from the internal knowledge base and/or the web depending on the question for getting answers using the Context Fusion Tool. 
+    Pass internal questions, external questions, {use_websearch} as use_websearch, and {topic} as parameters to the ContextFusionTool.
     If a quesion does not have an answer in the knowledge base or web, use the output from the web scrape extraction task and the extract info task to answer the question.
     The last resort should be using the generated content to frame an answer that is consistent with the other content of the PR/FAQ.
     Answer each question on the basis of this information and priority, framing it properly with proper formatting.
@@ -132,5 +161,6 @@ faq_answer_agent:
 
     Finally, combine the outut from content generator with the FAQs and UserResponse to generate the final output in JSON format as provided.
   backstory: >
-    You are a meticulous knowledge integration expert. You combine internal and external context and reframe it into well-structured answers following the PR FAQ format. You never hallucinate and always preserve facts. You know how to handle markdown tables and bullet points naturally.
+    You are a meticulous knowledge integration expert. You combine internal and external context and reframe it into well-structured, accurate answers using bullets and tables following the PR FAQ format. 
+    You never hallucinate and always preserve facts. You know how to handle markdown tables and bullet points naturally.
     Your goal is to ensure that every answer is exhaustive, precise, and free of ambiguity for both internal stakeholders and external customers.

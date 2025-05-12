@@ -1,6 +1,6 @@
-# __import__('pysqlite3')
-# import sys
-# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import io
@@ -67,7 +67,6 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
     # Initialize LLM
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
-    # Step 2: Refine the search query
     refine_prompt = f"""
         The user provided the following feedback:
         "{user_feedback}"
@@ -85,18 +84,16 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
 
-    # Step 3: Perform Web Search and Knowledge Base Search in Parallel
     kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
     web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
 
     with ThreadPoolExecutor() as executor:
-        kb_future = executor.submit(kb_tool.run, refined_query)
-        web_future = executor.submit(web_tool.run, query=refined_query, trust=True)
+        kb_future = executor.submit(kb_tool.run, question=refined_query, top_k=10)
+        web_future = executor.submit(web_tool.run, query=refined_query, trust=True, read_content=True, top_k=20)
 
         kb_response = kb_future.result()
         web_response = web_future.result()
 
-    # Step 4: Use Refined Query and Search Results to Generate a Response
     prompt = f"""You are an intelligent assistant tasked with responding to user response.
 
         User response:
@@ -141,7 +138,6 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
     """
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
-    # Step 1: Refine search query based on user feedback and context
     refine_prompt = f"""
         The user provided the following feedback:
         "{user_feedback}"
@@ -150,29 +146,29 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
         Problem statement: {problem}
         Solution: {solution}
 
-        Based on this feedback and the given context of topic, problem statement, solution, and recent chat history, determine the most effective search query to put in a search engine to gather relevant and latest information user feedback query around the topic, problem or solution.
-        Do not give specific queries about the product, be more general so that any relevant information regarding the problem or solution can be collected, even if it is not exact.
-        You can consider India for location-specific searches if required unless mentioned otherwise.
-        Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
-        Return ONLY the refined search query without any additional text. 
+        - Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
+        - Create a search query that balances specificity and breadth: it should aim to gather **detailed, structured information** that can answer the user feedback precisely (for example, cost breakdowns, competitor feature tables, regional insights), while also being broad enough to capture related insights.
+        - You can consider India for location-specific searches if required unless mentioned otherwise.
+        - Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+        - Prioritise Indian market context by default unless stated otherwise.
+        - If the query involves costing or pricing, explicitly add "India" and "cost breakdown" or "pricing table" in the search query.
+        - Return ONLY the refined search query as a string without any additional text.         
     """
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
 
-    # Step 2: Perform Web and Knowledge Base Searches in Parallel
     kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
     web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
 
     with ThreadPoolExecutor() as executor:
-        kb_future = executor.submit(kb_tool.run, refined_query)
-        web_future = executor.submit(web_tool.run, query=refined_query, trust=True)
+        kb_future = executor.submit(kb_tool.run, question=refined_query, top_k=10)
+        web_future = executor.submit(web_tool.run, query=refined_query, trust=True, read_content=True, top_k=20)
 
         kb_response = kb_future.result()
         web_response = web_future.result()
 
-    # Step 3: Use Refined Query and Search Results to Modify the FAQ
     prompt = f"""
-        You are an intelligent assistant tasked with modifying an existing PR FAQ based on user feedback.
+        You are an intelligent assistant working at 1Finance tasked with modifying an existing PR FAQ based on user feedback.
 
         The PR FAQ is generated based on the following:
         - Problem statement: {problem}
@@ -201,9 +197,15 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
         ```{existing_faq}```
 
         Instructions:
-        - Modify the PR FAQ comprehensively based on the identified goal, ensuring the PR FAQ is consistent throughout. 
-        - Any queries of adding information should be added to the existing PR FAQ in FAQs unless mentioned otherwise by the user, without affecting other sections of the PR FAQ.
-        - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format:
+        - Modify the PR FAQ comprehensively based on the user feedback, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the prfaq.
+        - Change the UserResponse field according to the user's feedback. It should be a reply to the user's message.
+        - Use information from the search results or knowledge base to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
+        - Ensure that any new information aligns with the problem statement and solution provided.
+        - [STRICT] Whenever the user feedback requests a table, ensure that the response **must include a well-formatted markdown table.** If the retrieved information lacks a table, extract the relevant data points and **format them into a table yourself.**
+        - For cost/pricing-related feedback, always assume the country context is India (unless otherwise stated) and provide costs in INR. Avoid using USD or other currencies unless specified.
+        - Prioritise Indian market context by default unless the user specifies otherwise.
+        - Assume any new feedback is a FAQ unless specified otherwise.
+        - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format: Use double quotes to wrap keys and values.
             Title: str
             Subtitle: str
             IntroParagraph: str
@@ -213,28 +215,75 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
             InternalFAQs: list
             ExternalFAQs: list
             UserResponse: str
-        - Use information from the search results, knowledge base or chat history to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive responses from the retrieved information.
-        - Ensure that any new information aligns with the problem statement and solution provided.
-        - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
-        - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
+        eg. {{
+                "Title": "Revolutionizing AI Assistants",
+                "Subtitle": "Introducing the Next-Gen AI for Business Solutions",
+                "IntroParagraph": "In today's digital age, businesses need smarter AI solutions to streamline workflows and improve efficiency. Our new AI assistant is here to revolutionize the way companies operate.",
+                "ProblemStatement": "Many businesses struggle with automating repetitive tasks, improving customer support, and handling large volumes of inquiries efficiently.",
+                "Solution": "Our AI assistant leverages cutting-edge NLP and machine learning to provide seamless automation, personalized responses, and real-time insights.",
+                "Competitors": [
+                    {{
+                    "name":"Amazon Rekognition", 
+                    "url":"https://docs.aws.amazon.com/rekognition/"
+                    }}, 
+                    {{
+                    "name":"Google Cloud Vision API", 
+                    "url":"https://cloud.google.com/vision/docs/detecting-safe-search"
+                    }}
+                ],
+                "InternalFAQs": [
+                    {{
+                        "Question": "How does the AI assistant integrate with existing tools?",
+                        "Answer": "It seamlessly integrates with platforms like \n-Slack \n-Microsoft Teams \n-CRM systems via APIs."
+                    }},
+                    {{
+                        "Question": "What kind of training data is required?",
+                        "Answer": "The AI assistant can be **fine-tuned** with company-specific data for enhanced performance."
+                    }}
+                ],
+                "ExternalFAQs": [
+                    {{
+                        "Question": "Is the AI assistant secure?",
+                        "Answer": "Yes, we use industry-standard encryption and compliance measures to ensure data security."
+                    }},
+                    {{
+                        "Question": "Can the AI assistant handle multiple languages?",
+                        "Answer": "Absolutely! It's developed in a way that supports multiple languages and can be customized based on user needs."
+                    }},
+                    {{
+                        "Question": "Can I use Markdown-style tables?",
+                        "Answer": "| Feature         | Benefit        |\n|------------------|----------------|\n| Auto-Generate    | Saves time     |\n| LLM-Driven       | Context aware  |"
+                    }},
+                    {{
+                        "Question": "Can I also return JSON-style tables?",
+                        "Answer": [
+                            {{"Input Type": "Markdown Table", "Support": "Yes"}},
+                            {{"Input Type": "JSON Table", "Support": "Yes"}}
+                        ]
+                    }}
+                ],
+                "UserResponse": "Here is the generated PR/FAQ document on topic and your provided inputs. Please review and let me know if any changes are needed."
+            }}
         - Avoid vague responses like "I don't know" or "Not specified." Use the given context to derive meaningful answers or omit such points.
+
         - While generating the FAQs and answers, follow these stylistic and tone guidelines:
             - Use British English (e.g., "capitalise," "colour").
             - Keep language human, positive and transparent.
             - Ensure the tone is formal yet personable, clear, and consistent with brand values.
             - Avoid technical jargon unless necessary, and explain all abbreviations/acronyms.
+
+        Here is the existing PR FAQ:
+        ```{existing_faq}```
     """
-
     response = llm.invoke(prompt)
-    response_text = response.content.strip()
+    response_text = str(response.content)
+    response_text = response_text.replace("```json","").replace("```","").strip()
 
-    # Step 4: Parse the Response
     try:
-        response_text = response_text.replace("```json", "").replace("```", "").strip()
         updated_faq = json.loads(response_text)
         return updated_faq
     except json.JSONDecodeError as e:
-        print(f"Failed to parse the updated PR FAQ: {e}")
+        st.error(f"Failed to parse the updated PR FAQ: {e}")
         return existing_faq
     
 MAX_FILES = 5
@@ -244,7 +293,7 @@ MAX_LINKS = 5
 
 def main():
     st.set_page_config(layout="wide")
-    st.title("PR/FAQ Generator (Beta v2.1)")
+    st.title("PR/FAQ Generator (Beta v3.0)")
 
     # Store PR FAQ and chat history in session state
     if "pr_faq" not in st.session_state:
@@ -265,7 +314,7 @@ def main():
                     - **Upload Reference Documents**: *Optional* Upload PDF or DOCX files for context.
                     - **Use Web Search**: Turn the switch on to use web search capabilities for generating your PRFAQ using latest and relevant information.
 
-                - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **3-5 minutes** depending on the complexity of your inputs.)
+                - **Click "Generate PR FAQ"**: The system will process your inputs and generate a PRFAQ. (*Note*: This process may take **4-8 minutes** depending on the complexity of your inputs.)
 
                 - **View Execution Details**: The app will display the generated PRFAQ and the time taken to generate it.
 
@@ -287,10 +336,10 @@ def main():
         if st.button("Generate PR FAQ"):
             if len(topic) < 3:
                 st.error("Title is too short. Please enter at least 3 characters.")
-            # elif len(problem) < 20:
-            #     st.error("Problem is too short. Please enter at least 20 characters.")
-            # elif len(solution) < 50:
-            #     st.error("Solution is too short. Please enter at least 50 characters.")
+            elif len(problem) < 20:
+                st.error("Problem is too short. Please enter at least 20 characters.")
+            elif len(solution) < 50:
+                st.error("Solution is too short. Please enter at least 50 characters.")
             else:
                 # Validate links
                 links_list = [link.strip() for link in web_scraping_links.split(",") if link.strip()]
@@ -333,7 +382,7 @@ def main():
                         'topic': topic,
                         'problem': problem,
                         'solution': solution,
-                        'chat_history': [""],
+                        'chat_history': ["Generate this PR/FAQ for me"],
                         # 'context': 'This is some default context.',
                         # 'content': 'This is some default content.',
                         'reference_doc_content': reference_doc_content,
