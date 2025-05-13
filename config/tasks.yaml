@@ -66,17 +66,18 @@ generate_faq_questions_task:
     
     Based on the generated PR FAQ introduction, create a comprehensive list of questions divided into two categories:
        1.**Internal FAQs**: (10-12 questions) focusing on:
-        - Business rationale and market need
+        - Business rationale, market need and target audience facing the issue
+        - Potential impact on business/Return on Investment (ROI) for the company
+        - Departments and their role in this execution, internal stakeholders, dependencies
         - Product vision and alignment with company strategy
         - Technical approach, risks, and scalability
-        - Internal roles, stakeholders, and dependencies according to 1 Finance's departments (do not name the departments in the questions)
         - Legal, compliance, and privacy concerns
         - Resourcing, timeline, and launch readiness
         - Success metrics and future roadmap
 
        2.**External FAQs**: (10-12 questions) focusing on:
         - What the product is and what problems it solves
-        - Who it's for and how it's used
+        - Who it's for and how it's used and its impact on their lives (how it makes their life better)
         - Pricing, availability, and onboarding process
         - Key features and known limitations
         - Security, privacy, and data handling
