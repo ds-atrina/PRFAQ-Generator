@@ -5,6 +5,7 @@ from qdrant_tool import kb_qdrant_tool
 from web_search import WebTrustedSearchTool  
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import os
 
 # Define the input schema
 class ContextFusionInputSchema(BaseModel):
@@ -53,7 +54,7 @@ class ContextFusionTool(BaseTool):
         all_questions = internal + external
 
         results = []
-        with ThreadPoolExecutor(max_workers=12) as executor:
+        with ThreadPoolExecutor(max_workers=os.getenv('THREAD_POOL_WORKERS', 12)) as executor:
             futures = [executor.submit(get_context_for_question, q, use_websearch, topic) for q in all_questions]
             for future in futures:
                 results.append(future.result())

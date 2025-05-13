@@ -34,7 +34,7 @@ def qdrant_tool(question: str, top_k:int) -> str:
     embedding = response.data[0].embedding
 
     search_result = connection.query_points(
-        collection_name=os.getenv("QDRANT_COLLECTION_NAME", "1F_KB_PRFAQ"),
+        collection_name=os.getenv("QDRANT_COLLECTION_NAME"),
         query=embedding,
         limit=top_k,
         with_payload=True
