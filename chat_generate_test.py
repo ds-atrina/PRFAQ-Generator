@@ -1,6 +1,6 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import io
@@ -93,6 +93,12 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
 
         kb_response = kb_future.result()
         web_response = web_future.result()
+    
+    print(f"""The web search returned the following results:
+        {web_response}
+        
+        The knowledge base search returned the following results:
+        {kb_response}""")
 
     prompt = f"""You are an intelligent assistant tasked with responding to user response.
 
@@ -166,6 +172,12 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
 
         kb_response = kb_future.result()
         web_response = web_future.result()
+    
+    print(f"""The web search returned the following results:
+        {web_response}
+        
+        The knowledge base search returned the following results:
+        {kb_response}""")
 
     prompt = f"""
         You are an intelligent assistant working at 1Finance tasked with modifying an existing PR FAQ based on user feedback.
@@ -336,10 +348,10 @@ def main():
         if st.button("Generate PR FAQ"):
             if len(topic) < 3:
                 st.error("Title is too short. Please enter at least 3 characters.")
-            elif len(problem) < 20:
-                st.error("Problem is too short. Please enter at least 20 characters.")
-            elif len(solution) < 50:
-                st.error("Solution is too short. Please enter at least 50 characters.")
+            # elif len(problem) < 20:
+            #     st.error("Problem is too short. Please enter at least 20 characters.")
+            # elif len(solution) < 50:
+            #     st.error("Solution is too short. Please enter at least 50 characters.")
             else:
                 # Validate links
                 links_list = [link.strip() for link in web_scraping_links.split(",") if link.strip()]
