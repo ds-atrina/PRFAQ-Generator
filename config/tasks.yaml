@@ -20,7 +20,6 @@ web_scrape_extraction_task:
     A structured JSON object containing all relevant extracted content from each web page. The key should be the URL and the value should be the extracted content. If no link is provided or the web page could not be scraped, the value should indicate the error or lack of content.
   agent: web_scrape_extractor
 
-# add 1f ka ek description line
 extract_info_task:
   description: >
     Carefully extract key information from the provided list of reference documents content ```{reference_doc_content}```. 
@@ -32,7 +31,6 @@ extract_info_task:
     A structured JSON object containing the extracted information ready for PR FAQ generation.
   agent: extract_info_agent
 
-#for extremely long docs handling
 content_generation_task:
   description: >
     Generate a highly detailed and structured PR FAQ introduction on ```{topic}``` by leveraging the provided prompt, the knowledge base information received from the {chat_history} and the output of kb_retrieval_task.
@@ -65,7 +63,7 @@ generate_faq_questions_task:
       3. Use the information from the output of web_scrape_extractor and the output of extract_info_agent.
     
     Based on the generated PR FAQ introduction, create a comprehensive list of questions divided into two categories:
-       1.**Internal FAQs**: (10-12 questions) focusing on:
+       1.**Internal FAQs**: (20 questions) focusing on:
         - Business rationale, market need and target audience facing the issue
         - Potential impact on business/Return on Investment (ROI) for the company
         - Departments and their role in this execution, internal stakeholders, dependencies
@@ -75,18 +73,21 @@ generate_faq_questions_task:
         - Resourcing, timeline, and launch readiness
         - Success metrics and future roadmap
 
-       2.**External FAQs**: (10-12 questions) focusing on:
+       2.**External FAQs**: (20 questions) focusing on:
         - What the product is and what problems it solves
         - Who it's for and how it's used and its impact on their lives (how it makes their life better)
         - Pricing, availability, and onboarding process
         - Key features and known limitations
         - Security, privacy, and data handling
         - Support and future updates
+
+    Now from the list of 20 questions each, combine certain questions that are similar or overlapping in nature or may have an answer in a similar vein to make it more concise and relevant.
+    After combining these questions, make sure that the count of questions in each category is around 8-10.
     Read the last user message from the above provided given chat history, accordingly make the PRFAQ or make the changes and add a field of UserResponse as a reply to what the user requested in that last message. 
 
     **Important Considerations to be followed STRICTLY:**
       - THE QUESTIONS SHOULD BE EXHAUSTIVE.
-      - Include examples, step-by-step guidance, markdown-formatted tables where applicable, and clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+      - THE QUESTIONS CAN BE ANSWERED ACCURATELY BY THE knowledge base, reference document from extracted info agent and web scrape extractor.
       - **Do not** repeat the same ideas in slightly different wording.
       - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
 
