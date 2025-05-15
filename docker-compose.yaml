@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: 
     container_name: pr-python
     env_file: .env    
     ports:
