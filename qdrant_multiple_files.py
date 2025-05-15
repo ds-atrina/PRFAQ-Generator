@@ -16,10 +16,9 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 # Initialize Qdrant
 qdrant_url = os.getenv("QDRANT_URL")
 connection = QdrantClient(url=qdrant_url)
-collection_name = "1finance_kb_department"
+collection_name = "1F_KB_BASE_PF"
 
 # Ensure the collection exists
-collection_name = "1finance_kb_department"
 connection.create_collection(
     collection_name=collection_name,
     vectors_config=models.VectorParams(size=1536, distance=models.Distance.COSINE),
@@ -37,7 +36,7 @@ def extract_text_from_pdf(pdf_path):
 def get_text_chunks(text):
     text_splitter = RecursiveCharacterTextSplitter(
         separators=["\n\n", "\n", " "],
-        chunk_size=2000,
+        chunk_size=1800,
         chunk_overlap=200,
         length_function=len
     )
@@ -59,12 +58,22 @@ def process_and_upload_pdf(pdf_path):
         raw_text = extract_text_from_pdf(pdf_path)
         chunks = get_text_chunks(raw_text)
 
+        file_name = os.path.basename(pdf_path)
+
         points = []
         for i, chunk in enumerate(chunks):
             print(f"Embedding chunk {i+1}/{len(chunks)}")
             embedding = get_embedding(chunk)
             point_id = str(uuid.uuid4())
-            points.append(PointStruct(id=point_id, vector=embedding, payload={"text": chunk}))
+
+            # Add metadata as payload
+            payload = {
+                "text": chunk,
+                "chunk_index": i,
+                "file_name": file_name,
+            }
+
+            points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
 
         # Batch insert to Qdrant (in 100s)
         BATCH_SIZE = 100
@@ -77,50 +86,20 @@ def process_and_upload_pdf(pdf_path):
     except Exception as e:
         print(f"Error processing '{pdf_path}': {str(e)}")
 
-def process_multiple_pdfs(pdf_paths):
-    for i, pdf_path in enumerate(pdf_paths):
-        print(f"\n========== File {i+1}/{len(pdf_paths)} ==========")
+
+def process_multiple_pdfs_in_folder(folder_path):
+    # Get a list of all PDF files in the folder
+    pdf_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.lower().endswith('.pdf')]
+    
+    if not pdf_files:
+        print("No PDF files found in the provided folder.")
+        return
+    
+    for i, pdf_path in enumerate(pdf_files):
+        print(f"\n========== File {i+1}/{len(pdf_files)} ==========")
         process_and_upload_pdf(pdf_path)
-                   
+
 # Example usage
 if __name__ == "__main__":
-    pdf_files = [
-        "1F_KB_Documents/1 View.pdf",
-        "1F_KB_Documents/1F_Department.pdf",
-        "1F_KB_Documents/Assisted ITR Filing.pdf",
-        "1F_KB_Documents/Data Analytics.pdf",
-        "1F_KB_Documents/Debt Advisory.pdf",
-        "1F_KB_Documents/Debt MF Scoring and Ranking.pdf",
-        "1F_KB_Documents/Doculocker.pdf",
-        "1F_KB_Documents/Engineering Playbook.pdf",
-        "1F_KB_Documents/Enterprise Operating System.pdf",
-        "1F_KB_Documents/Fianancial Concierge.pdf",
-        "1F_KB_Documents/Finance Health Score.pdf",
-        "1F_KB_Documents/Financial Planing Center.pdf",
-        "1F_KB_Documents/GFPS 2024 Website.pdf",
-        "1F_KB_Documents/Global Financial Planners Summit 2023.pdf",
-        "1F_KB_Documents/Help & Support.pdf",
-        "1F_KB_Documents/India Crypto Research.pdf",
-        "1F_KB_Documents/India HR Conclave 2025.pdf",
-        "1F_KB_Documents/Insurance App.pdf", 
-        "1F_KB_Documents/IPO Updates.pdf",
-        "1F_KB_Documents/Linkedin Newsletter.pdf",
-        "1F_KB_Documents/Loan Against Insurance.pdf",
-        "1F_KB_Documents/Macro Indicators.pdf",
-        "1F_KB_Documents/Magazine Website.pdf", 
-        "1F_KB_Documents/Moneysign CUG Event.pdf",
-        "1F_KB_Documents/Moneysign v1.0.pdf",
-        "1F_KB_Documents/P2P Investment V1.pdf",
-        "1F_KB_Documents/PF TV YT.pdf",
-        "1F_KB_Documents/PF TV YT FAQs.pdf",
-        "1F_KB_Documents/PlanMyTax.pdf",
-        "1F_KB_Documents/Playbook.pdf",
-        "1F_KB_Documents/QFA.pdf",
-        "1F_KB_Documents/Ranking Financial Products.pdf",
-        "1F_KB_Documents/Real Estate Advisory.pdf",
-        "1F_KB_Documents/Super App.pdf",
-        "1F_KB_Documents/Website for Financial Wellbeing.pdf",
-        "1F_KB_Documents/Website Insurance pages.pdf",
-        "1F_KB_Documents/Websites Playbook.pdf"
-      ]  # Add your PDF file paths here
-    process_multiple_pdfs(pdf_files)
+    folder_path = "new_transformed_QA"  
+    process_multiple_pdfs_in_folder(folder_path)

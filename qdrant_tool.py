@@ -6,7 +6,9 @@ from qdrant_client.http.models import Distance
 from qdrant_client.http.models import PointStruct, VectorParams
 import uuid
 from crewai.tools import BaseTool
+from dotenv import load_dotenv
 
+load_dotenv()
 # Define the `tool` decorator if it cannot be imported
 def tool(name: str):
     def decorator(func):

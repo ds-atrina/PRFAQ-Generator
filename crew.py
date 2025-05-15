@@ -56,7 +56,7 @@ class PRFAQGeneratorCrew:
         self.topic = inputs.get("topic")
         self.problem = inputs.get("problem")
         self.solution = inputs.get("solution")
-        self.chat_history = inputs.get("chat_history", [""])
+        self.chat_history = inputs.get("chat_history", ["Generate this PR/FAQ for me"])
         self.reference_doc_content = inputs.get("reference_doc_content", "")
         self.web_scraping_links = inputs.get("web_scraping_links", "")
         self.use_websearch = inputs.get("use_websearch", False)
@@ -112,7 +112,8 @@ class PRFAQGeneratorCrew:
         return Agent(
             config=self.agents_config["faq_answer_agent"],
             verbose=True,
-            llm=get_openai_llm()
+            llm=get_openai_llm(),
+            tools = [ContextFusionTool()]
         )
 
     @task
@@ -125,7 +126,7 @@ class PRFAQGeneratorCrew:
             query = f"Retrieve all information about {topic}. The problem is: {problem}. The proposed solution is: {solution}."
             logging.info(f"Constructed query for KB: {query}")
 
-            kb_response = kb_qdrant_tool(question=query, top_k=7)
+            kb_response = kb_qdrant_tool(question=query, top_k=10)
             return {"kb_content": kb_response}
 
         return Task(
@@ -183,7 +184,7 @@ class PRFAQGeneratorCrew:
             topic = inputs.get("topic", "Default Topic")
             problem = inputs.get("problem", "Default Problem")
             solution = inputs.get("solution", "Default Solution")
-            chat_history = inputs.get("chat_history", [""])
+            chat_history = inputs.get("chat_history", ["Generate this PR/FAQ for me"])
 
             agent = self.content_generation_agent()
             content = agent.execute(task_inputs={"topic": topic, "problem": problem, "solution": solution, "chat_history": chat_history})
@@ -201,14 +202,15 @@ class PRFAQGeneratorCrew:
     @task
     def generate_faq_questions_task(self) -> Task:
         def task_logic(inputs):
-            chat_history = inputs.get("chat_history", [""])
+            chat_history = inputs.get("chat_history", ["Generate this PR/FAQ for me"])
             faq_agent = self.faq_question_generator()
             question_json = faq_agent.execute(task_inputs={"chat_history": chat_history})
             return question_json
 
         return Task(
             config=self.tasks_config["generate_faq_questions_task"],
-            logic=task_logic
+            logic=task_logic,
+            context=[self.kb_retrieval_task(), self.web_scrape_extraction_task(), self.extract_info_task(), self.content_generation_task()],
         )
 
     @task
