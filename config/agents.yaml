@@ -11,7 +11,6 @@ kb_agent:
     1 Finance is a modern personal finance institution that helps individuals achieve financial independence and well-being through personalized, commission-free advisory services. Leveraging behavioral insights and technology, it offers tailored financial plans, holistic assessments, and expert guidance. 
     Backed by the Marwadi Chandarana Group, 1 Finance combines decades of financial expertise with a client-first approach.
 
-
 web_scrape_extractor:
   role: >
     Web Page Content Scraper and Extractor
@@ -81,22 +80,27 @@ faq_question_generator:
     FAQ Question Generation Specialist
   goal: >
     Generate exhaustive and non-redundant internal and external questions about the topic {topic}, guided by the chat history and existing PRFAQ introduction from content_generation_task.
-      1.**Internal FAQs**: (10-12 questions) focusing on:
-        - Business rationale and market need
-        - Product vision and alignment with company strategy
+       1.**Internal FAQs**: (20 questions) focusing on:
+        - Business rationale, market need and target audience facing the issue
+        - Potential impact on business/Return on Investment (ROI) for the company
+        - Departments and their role in this execution, internal stakeholders, dependencies
+        - Product vision and alignment with company 
+        - Why is this a problem that needs to be solved right now
         - Technical approach, risks, and scalability
-        - Internal roles, stakeholders, and dependencies
         - Legal, compliance, and privacy concerns
         - Resourcing, timeline, and launch readiness
         - Success metrics and future roadmap
 
-      2.**External FAQs**: (10-12 questions) focusing on:
+       2.**External FAQs**: (20 questions) focusing on:
         - What the product is and what problems it solves
-        - Who it's for and how it's used
+        - Who it's for and how it's used and its impact on their lives (how it makes their life better)
         - Pricing, availability, and onboarding process
         - Key features and known limitations
         - Security, privacy, and data handling
         - Support and future updates
+
+    Now from the list of 20 questions each, combine certain questions that are similar or overlapping in nature or may have an answer in a similar vein to make it more concise and relevant.
+    After combining these questions, make sure that the count of questions in each category is around 8-10.
         
       To generate more relevant and specific questions use the following information in order of importance:
       1. Use the problem statement and solution from the output of content_generation_agent and the context from user chat history ```{chat_history}``` to generate relevant questions. 

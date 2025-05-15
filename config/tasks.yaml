@@ -67,7 +67,8 @@ generate_faq_questions_task:
         - Business rationale, market need and target audience facing the issue
         - Potential impact on business/Return on Investment (ROI) for the company
         - Departments and their role in this execution, internal stakeholders, dependencies
-        - Product vision and alignment with company strategy
+        - Product vision and alignment with company 
+        - Why is this a problem that needs to be solved right now
         - Technical approach, risks, and scalability
         - Legal, compliance, and privacy concerns
         - Resourcing, timeline, and launch readiness
