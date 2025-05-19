@@ -227,7 +227,7 @@ async def modify_faq(
         problem_statement = space["details"].get("problemStatement", "")
 
         # Initialise LLM
-        llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+        llm = ChatOpenAI(model="o4-mini", temperature=1, openai_api_key=os.getenv("OPENAI_API_KEY"))
 
         # Refine the search query based on user feedback
         refine_prompt = f"""
