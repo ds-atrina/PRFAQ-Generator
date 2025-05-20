@@ -65,7 +65,7 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
     This function is optimized for performance and generalized for various conversational queries.
     """
     # Initialize LLM
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    llm = ChatOpenAI(model="o4-mini", temperature=1)  # Initialize LLM
 
     refine_prompt = f"""
         The user provided the following feedback:
@@ -142,7 +142,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
     Modify an existing PR FAQ based on user feedback, chat history, and additional context. 
     This function uses refined search queries to gather relevant information from web and knowledge base searches.
     """
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    llm = ChatOpenAI(model="o4-mini", temperature=1)  # Initialize LLM
 
     refine_prompt = f"""
         The user provided the following feedback:
@@ -223,7 +223,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
             IntroParagraph: str
             ProblemStatement: str
             Solution: str
-            Competitors: list
+            Competitors: list of dict
             InternalFAQs: list
             ExternalFAQs: list
             UserResponse: str

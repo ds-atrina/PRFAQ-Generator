@@ -227,17 +227,23 @@ async def modify_faq(
         problem_statement = space["details"].get("problemStatement", "")
 
         # Initialise LLM
-        llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+        llm = ChatOpenAI(model="o4-mini", temperature=1, openai_api_key=os.getenv("OPENAI_API_KEY"))
 
         # Refine the search query based on user feedback
         refine_prompt = f"""
             Based on the user feedback and the given context of topic, problem statement, and solution:
+            The user provided the following feedback: "{messages[-1]}"
             Topic: {title}
             Problem statement: {problem_statement}
             Solution: {solution}
 
-            Determine the most effective search query to gather relevant and latest information. Be general, avoid specific product details, and avoid proper nouns and dates.
-            Return ONLY the refined search query without any additional text.
+        - Based on this feedback and the given context of topic, problem statement and solution, determine the most effective search query to put in a search engine to gather relevant and latest information user feeback query around the topic, problem or solution.
+        - Create a search query that balances specificity and breadth: it should aim to gather **detailed, structured information** that can answer the user feedback precisely (for example, cost breakdowns, competitor feature tables, regional insights), while also being broad enough to capture related insights.
+        - You can consider India for location-specific searches if required unless mentioned otherwise.
+        - Avoid mentioning proper nouns or dates/years in the prompt, instead use words like "latest" and general key terms from the context. 
+        - Prioritise Indian market context by default unless stated otherwise.
+        - If the query involves costing or pricing, explicitly add "India" and "cost breakdown" or "pricing table" in the search query.
+        - Return ONLY the refined search query as a string without any additional text.      
         """
         refined_query_response = llm.invoke(refine_prompt)
         refined_query = refined_query_response.content.strip()
@@ -273,19 +279,20 @@ async def modify_faq(
             The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
             "{kb_response}"
 
-            Here is the existing PR FAQ in markdown format:
-            ```{current_prfaq}```
-
             Chat history for context:
             ```{messages}```
+
+            Here is the existing PR FAQ in markdown format:
+            ```{current_prfaq}```
 
             Instructions:
             - Modify the PR FAQ comprehensively based on the user feedback, ensure the PR FAQ is consistent throughout and any changes or additions are reflected throughout the prfaq.
             - Change the UserResponse field according to the user's feedback. It should be a reply to the user's message.
             - Use information from the search results, knowledge base or chat history to make the required changes or additions in the PR FAQ. Give relevant, latest and comprehensive answers from the retrieved information.
             - Ensure that any new information aligns with the problem statement and solution provided.
-            - Use proper markdown-formatted tables in FAQs for any table requests by default, unless specified otherwise in the feedback.
-            - If the feedback requests comparisons, include specific competitor information where available from the search results and so on.
+            - [STRICT] Whenever the user feedback requests a table, ensure that the response **must include a well-formatted markdown table.** If the retrieved information lacks a table, extract the relevant data points and **format them into a table yourself.**
+            - For cost/pricing-related feedback, always assume the country context is India (unless otherwise stated) and provide costs in INR. Avoid using USD or other currencies unless specified.
+            - Prioritise Indian market context by default unless the user specifies otherwise.
             - Assume any new feedback is a FAQ unless specified otherwise.
             - [STRICT] DO NOT CHANGE THE FORMATTING OR THE STRUCTURE OF THE EXISTING PR FAQ and return the entire (ALL FIELDS WITHOUT OMITTING ANY, AS THEY ARE WITH UPDATES, IF ANY), updated PR FAQ in STRICT JSON format: Use double quotes to wrap keys and values.
                 Title: str
@@ -352,14 +359,10 @@ async def modify_faq(
                 - Keep language human, positive and transparent.
                 - Ensure the tone is formal yet personable, clear, and consistent with brand values.
                 - Avoid technical jargon unless necessary, and explain all abbreviations/acronyms.
-
-            Here is the existing PR FAQ in markdown format:
-            ```{current_prfaq}```
         """
         response = llm.invoke(prompt)
         response_text = str(response.content.strip())
-        # print(response_text)
-        # Parse the response
+
         try:
             cleaned_json = response_text.replace("```json", "").replace("```", "").strip()
             parsed_output = json.loads(cleaned_json)

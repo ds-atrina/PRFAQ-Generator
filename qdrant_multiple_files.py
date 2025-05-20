@@ -84,9 +84,8 @@ def process_and_upload_pdf(pdf_path):
 
         print(f"Uploaded document: {pdf_path}")
     except Exception as e:
-        print(f"Error processing '{pdf_path}': {str(e)}")
-
-
+        print(f"Error processing '{pdf_path}': {str(e)}")      
+          
 def process_multiple_pdfs_in_folder(folder_path):
     # Get a list of all PDF files in the folder
     pdf_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.lower().endswith('.pdf')]
