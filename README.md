@@ -1,5 +1,3 @@
-I'll create a comprehensive README.md for your PRFAQ-Generator project based on the codebase structure you've described.
-
 # PRFAQ-Generator
 
 A system for generating PR/FAQ documents using AI agents and multiple data sources. This tool leverages CrewAI, OpenAI, and various information retrieval mechanisms to create comprehensive PR/FAQ documents based on user inputs.
