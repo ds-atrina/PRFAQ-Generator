@@ -3,9 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 from langchain_openai import ChatOpenAI  
-from web_search import WebTrustedSearchTool
+from tools.web_search.web_search import WebTrustedSearchTool
 from concurrent.futures import ThreadPoolExecutor
-from qdrant_tool import kb_qdrant_tool
+from tools.qdrant_tool import kb_qdrant_tool
 from postgrest import APIError
 import os
 import json

@@ -6,12 +6,12 @@ from typing import Dict, Any
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from pydantic import BaseModel
-from utils import remove_links, get_openai_llm
+from utils.utils import remove_links, get_openai_llm
 from crewai_tools import ScrapeWebsiteTool, WebsiteSearchTool
-from web_search import WebTrustedSearchTool
-from whitelisted_sites import whitelisted_domain_list, whitelisted_site_list
-from qdrant_tool import kb_qdrant_tool
-from context_fusion_tool import ContextFusionTool
+from tools.web_search.web_search import WebTrustedSearchTool
+from tools.web_search.whitelisted_sites import whitelisted_domain_list, whitelisted_site_list
+from tools.qdrant_tool import kb_qdrant_tool
+from tools.context_fusion_tool import ContextFusionTool
 from dotenv import load_dotenv
 
 # Load environment variables
