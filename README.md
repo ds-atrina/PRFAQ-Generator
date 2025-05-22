@@ -72,7 +72,7 @@ Common utility functions used throughout the application.
 - `get_openai_llm`: Creates an OpenAI LLM instance
 - `render_text_or_table_to_str`: Formats data for display
 
-#### utils/qdrant_collection.py
+#### utils/qdrant_multiple_files.py
 Handles the creation and management of Qdrant vector database collections.
 - Creates and configures vector collections
 - Processes and chunks text for efficient storage
@@ -92,13 +92,14 @@ Combines information from multiple sources to create a coherent context.
 - Resolves conflicts between different information sources
 - Prioritizes information based on relevance and reliability
 
-#### tools/websearch/websearch.py
+#### tools/web_search
+##### web_search.py
 Implements web search functionality using Brave.
 - `WebTrustedSearchTool` class: Performs web searches
 - Domain relevance scoring and content quality assessment
 - HTML response parsing for extracting search results
 
-#### tools/websearch/whitelisted_sites.py
+##### whitelisted_sites.py
 Contains lists of trusted domains and specific URLs for web searches.
 - `whitelisted_site_list`: Specific trusted URLs
 - `whitelisted_domain_list`: Trusted domains for filtering search results 
@@ -108,7 +109,7 @@ Contains lists of trusted domains and specific URLs for web searches.
 1. **User Input**: User provides topic, problem, solution, and optional reference materials via the Streamlit UI
 2. **Information Gathering**: System retrieves information from:
    - Knowledge base (Qdrant vector database)
-   - Web search (SearxNG with trusted domains)
+   - Web search (Brave search with trusted domains)
    - Uploaded documents (PDF/DOCX)
    - Provided URLs
 3. **Content Generation**: AI agents process gathered information to generate:
@@ -127,6 +128,11 @@ Contains lists of trusted domains and specific URLs for web searches.
 2. Set up environment variables:
    - `OPENAI_API_KEY`: Your OpenAI API key
    - `QDRANT_URL`: URL of your Qdrant service
+   - `QDRANT_COLLECTION_NAME`: Collection in your Qdrant service to be used as Knowledge Base
+   - `BRAVE_API_KEY`: Your Brave API key for web search
+   To use the APIs, you will also need:
+   - `SUPABASE_URL`: The URL of Supabase where the inputs are fetched from
+   - `SUPABASE_KEY`: The key of Supabase where the inputs are fetched from
 
 3. Run the application:
    ```
@@ -137,7 +143,7 @@ Contains lists of trusted domains and specific URLs for web searches.
 
 ## Dependencies
 
-- Python 3.11+
+- Python 3.11
 - Streamlit
 - OpenAI API
 - CrewAI
