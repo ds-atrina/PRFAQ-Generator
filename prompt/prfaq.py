@@ -24,7 +24,7 @@ def CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_
         "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
         "ProblemStatement": "3-4 sentences describing the problems this product/feature plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
         "Solution": "3-5 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
-        "Competitors": [{{"name": "Company name or Product name", "url":"URL of the product website"}}] [LIST OF GENUINE COMPANIES JSON]
+        "Competitors": [{{"name": "Company name or Product name", "url":"URL of the product website"}}] [LIST OF GENUINE COMPANIES/PRODUCTS JSON (don't make up names or URLs or use blogs)],
         }}
     """
 

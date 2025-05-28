@@ -199,7 +199,7 @@ def start_langgraph(inputs, streaming_callback):
     builder.add_edge("answer_faqs", END)
 
     workflow = builder.compile()
-    final_output = workflow.invoke(inputs)
+    final_output = workflow.invoke(inputs, config={"streaming_callback": None})
     return final_output
 
 def print_streaming_callback(data):

@@ -172,9 +172,9 @@ async def generate_prfaq(
             "reference_doc_content": reference_content,
             "use_websearch": x_web_search.lower()=='true'  # Convert string to boolean
         }
-
+        
         # Instantiate and kickoff the PR FAQ generation
-        result = start_langgraph(inputs)
+        result = start_langgraph(inputs, None)
 
         markdown = format_output(result)
         user_response = result.get("UserResponse", "Here's the generated document for you:")

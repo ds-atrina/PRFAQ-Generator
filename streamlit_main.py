@@ -276,7 +276,7 @@ MAX_LINKS = 5
 
 def main():
     st.set_page_config(layout="wide")
-    st.title("PR/FAQ Generator (Beta v3.0)")
+    st.title("PR/FAQ Generator (Beta v4.0)")
 
     # Store PR FAQ and chat history in session state
     if "pr_faq" not in st.session_state:
@@ -378,7 +378,7 @@ def main():
                     def streamlit_step_callback(data):
                         step_placeholder.info(f"**Step:** {data['step']}\n\n{data['detail']}")
 
-                    cleaned_json = start_langgraph(inputs, streaming_callback=streamlit_step_callback)
+                    cleaned_json = start_langgraph(inputs, streaming_callback=None)
                     # print(f"Generated PR FAQ: {cleaned_json}")
                     try:
                         st.session_state.pr_faq = cleaned_json  # Store in session
