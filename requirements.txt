@@ -11,3 +11,4 @@ pysqlite3-binary
 setuptools
 supabase
 postgrest
+langgraph
