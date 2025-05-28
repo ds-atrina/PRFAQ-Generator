@@ -147,7 +147,7 @@ def answer_faq_node(state: State, streaming_callback) -> State:
 
     response= "\n\n".join(results)
     
-    prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_doc_content, web_scrape_content, generated_content, response)
+    prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, web_scrape_content, reference_doc_content)
     response = llm.invoke(prompt)
     response = convert_to_json(response.content)
     stream_thinking_step(state, "answer_faqs", "PRFAQ generated!", streaming_callback)

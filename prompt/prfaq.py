@@ -78,7 +78,8 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
                 ...
             ]
         }}"""
-    
+    prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_doc_content, web_scrape_content, generated_content, response)
+
 def ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, web_scrape_content, reference_doc_content):
     return f""" You are generating the PR/FAQ document for the topic `{topic}`, problem statement {problem} and solution {solution}.
     You are supposed to generate proper markdown formatted answers for each question based on available information, the answers from KB and web search are as follows: 
