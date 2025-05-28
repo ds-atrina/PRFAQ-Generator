@@ -29,7 +29,7 @@ def CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_
     """
 
 def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
-    f"""Generate exhaustive and non-redundant internal and external questions about the topic `{topic}`, problem statement `{problem}` and solution `{solution}`, guided by the chat history and existing PRFAQ introduction from content_generation_task.
+    return f"""Generate exhaustive and non-redundant internal and external questions about the topic `{topic}`, problem statement `{problem}` and solution `{solution}`, guided by the chat history and existing PRFAQ introduction from content_generation_task.
         1.**Internal FAQs**: (20 questions) focusing on:
             - Business rationale, market need and target audience facing the issue
             - Potential impact on business/Return on Investment (ROI) for the company
