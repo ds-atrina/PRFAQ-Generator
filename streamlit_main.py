@@ -10,12 +10,11 @@ import docx
 import json
 import time
 import openai
-from utils.utils import extract_text_from_pdf, render_text_or_table_to_str
+from utils.utils import extract_text_from_pdf, render_text_or_table_to_str, convert_to_json
 from langchain_openai import ChatOpenAI  
-from crew import PRFAQGeneratorCrew
-from tools.web_search.web_search import WebTrustedSearchTool
-from tools.qdrant_tool import kb_qdrant_tool
-from concurrent.futures import ThreadPoolExecutor
+from graph import start_langgraph
+from tools.context_fusion_tool import ContextFusionTool
+
 
 # Ensure `src/` is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
@@ -84,21 +83,10 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
 
-    kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
-    web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
-
-    with ThreadPoolExecutor() as executor:
-        kb_future = executor.submit(kb_tool.run, question=refined_query, top_k=10)
-        web_future = executor.submit(web_tool.run, query=refined_query, trust=True, read_content=True, top_k=20)
-
-        kb_response = kb_future.result()
-        web_response = web_future.result()
+    tool = ContextFusionTool()
+    context_response=tool.run(question=refined_query)
     
-    print(f"""The web search returned the following results:
-        {web_response}
-        
-        The knowledge base search returned the following results:
-        {kb_response}""")
+    print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")
 
     prompt = f"""You are an intelligent assistant tasked with responding to user response.
 
@@ -114,11 +102,8 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
         A search was carried out for the feedback with the refined query:
         "{refined_query}"
 
-        The web search returned the following results:
-        "{web_response}"
-        
-        The knowledge base search returned the following results:
-        "{kb_response}"
+        The response from web search and knowledge base search is as follows:
+        {context_response}
 
         Here is the chat history for context:
         {json.dumps(chat_history[-6:], indent=4)}
@@ -163,21 +148,10 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
 
-    kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
-    web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
-
-    with ThreadPoolExecutor() as executor:
-        kb_future = executor.submit(kb_tool.run, question=refined_query, top_k=10)
-        web_future = executor.submit(web_tool.run, query=refined_query, trust=True, read_content=True, top_k=20)
-
-        kb_response = kb_future.result()
-        web_response = web_future.result()
+    tool = ContextFusionTool()
+    context_response=tool.run(question=refined_query)
     
-    print(f"""The web search returned the following results:
-        {web_response}
-        
-        The knowledge base search returned the following results:
-        {kb_response}""")
+    print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")        
 
     prompt = f"""
         You are an intelligent assistant working at 1Finance tasked with modifying an existing PR FAQ based on user feedback.
@@ -199,11 +173,8 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
         A search was carried out for the feedback with the refined query:
         "{refined_query}"
 
-        The web search returned the following results. Use this information to enhance the FAQ wherever relevant:
-        "{web_response}"
-        
-        The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
-        "{kb_response}"
+        The response from web search and knowledge base search is as follows:
+        {context_response}
 
         Here is the existing PR FAQ:
         ```{existing_faq}```
@@ -402,23 +373,24 @@ def main():
                         'use_websearch':use_websearch
                     }
 
-                    # Generate PR FAQ using Crew
-                    pr_faq_crew = PRFAQGeneratorCrew(inputs)
-                    crew_output = pr_faq_crew.crew().kickoff(inputs=inputs)
-                    cleaned_json = crew_output.raw.replace("```json","").replace("```","").strip()
+                    step_placeholder = st.empty()
 
+                    def streamlit_step_callback(data):
+                        step_placeholder.info(f"**Step:** {data['step']}\n\n{data['detail']}")
+
+                    cleaned_json = start_langgraph(inputs, streaming_callback=streamlit_step_callback)
+                    # print(f"Generated PR FAQ: {cleaned_json}")
                     try:
-                        parsed_output = json.loads(cleaned_json)
-                        st.session_state.pr_faq = parsed_output  # Store in session
+                        st.session_state.pr_faq = cleaned_json  # Store in session
                         st.success("PR FAQ generated successfully!")
-                        st.session_state.chat_history.append({"role": "assistant", "content": display_output(parsed_output)})
+                        st.session_state.chat_history.append({"role": "assistant", "content": display_output(cleaned_json)})
                     except json.JSONDecodeError as e:
                         st.session_state.pr_faq = modify_faq(cleaned_json, "Solve this in my JSON, I got this error: " + str(e), topic, problem, solution)
                         
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
                 st.write(f"It took me {execution_time:.2f} seconds to generate this PR FAQ for you!")
-                print(f"Token Usage: {crew_output.token_usage}")
+                # print(f"Token Usage: {crew_output.token_usage}")
     
     if st.session_state.pr_faq:
         for message in st.session_state.chat_history:

@@ -1,30 +1,24 @@
-from fastapi import FastAPI, HTTPException, Header
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, List
 from langchain_openai import ChatOpenAI  
-from tools.web_search.web_search import WebTrustedSearchTool
 from concurrent.futures import ThreadPoolExecutor
-from tools.qdrant_tool import kb_qdrant_tool
+from tools.context_fusion_tool import ContextFusionTool
 from postgrest import APIError
+from fastapi.responses import StreamingResponse
+import asyncio
 import os
 import json
 from dotenv import load_dotenv
 load_dotenv()
-from crew import PRFAQGeneratorCrew
+
+from servers.app import app
+
+from graph import start_langgraph
 
 # Load environment variables (e.g., Supabase credentials)
 load_dotenv()
 
-# Initialize FastAPI
-app = FastAPI(title="PRFAQ Generator API")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 # Supabase client initialization
 from supabase import create_client
 
@@ -180,14 +174,10 @@ async def generate_prfaq(
         }
 
         # Instantiate and kickoff the PR FAQ generation
-        crew_instance = PRFAQGeneratorCrew(inputs)
-        result = crew_instance.crew().kickoff(inputs=inputs)
+        result = start_langgraph(inputs)
 
-        
-        cleaned_json = result.raw.replace("```json", "").replace("```", "").strip()
-        parsed_output = json.loads(cleaned_json)
-        markdown = format_output(parsed_output)
-        user_response = parsed_output.get("UserResponse", "Here's the generated document for you:")
+        markdown = format_output(result)
+        user_response = result.get("UserResponse", "Here's the generated document for you:")
 
         return {
             "markdown_output": markdown,
@@ -203,6 +193,74 @@ async def generate_prfaq(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
+def sse_format(data, event=None):
+    """Format a dict as an SSE event string."""
+    prefix = f"event: {event}\n" if event else ""
+    return f"{prefix}data: {json.dumps(data)}\n\n"
+
+@app.post("/generate-prfaq-logs")
+async def generate_prfaq_logs(
+    request: Request,
+    x_space_id: str = Header(..., alias="x-space-id"),
+    x_thread_id: Optional[str] = Header(None, alias="x-thread-id"),
+    x_command: Optional[str] = Header(None, alias="x-command"),
+    x_web_search: Optional[str] = Header("False", alias="x-web-search"),
+):
+    """
+    SSE Streaming endpoint for PRFAQ generation.
+    Yields "step" events for each thinking step, and a final "result" event for the output.
+    """
+    # Fetch space and docs as in your current code...
+    try:
+        # # Parse body to extract messages (adjust as needed)
+        messages = request.messages
+        if not messages:
+            messages = ["Generate PR/FAQ for me"]
+
+        space = fetch_space_details(x_space_id)
+        title = space["title"]
+        solution = space["details"].get("solution", "")
+        problem_statement = space["details"].get("problemStatement", "")
+        links = space.get("links", "")
+
+        reference_content = fetch_space_documents(x_space_id, x_thread_id)
+
+        inputs = {
+            "topic": title,
+            "problem": problem_statement,
+            "solution": solution,
+            "chat_history": messages,
+            "web_scraping_links": links,
+            "reference_doc_content": reference_content,
+            "use_websearch": x_web_search.lower() == 'true'
+        }
+
+        async def event_generator():
+            loop = asyncio.get_running_loop()
+            queue = asyncio.Queue()
+
+            def streaming_callback(data):
+                asyncio.run_coroutine_threadsafe(queue.put(data), loop)
+
+            def run_workflow():
+                result = start_langgraph(inputs, streaming_callback=streaming_callback)
+                asyncio.run_coroutine_threadsafe(queue.put({"__final__": result}), loop)
+
+            executor = ThreadPoolExecutor(max_workers=10)
+            loop.run_in_executor(executor, run_workflow)
+
+            while True:
+                data = await queue.get()
+                if "__final__" in data:
+                    yield sse_format({"result": data["__final__"]}, event="result")
+                    break
+                else:
+                    yield sse_format(data, event="step")
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 @app.post("/modify-prfaq", response_model=PRFAQResponse)
 async def modify_faq(
@@ -249,15 +307,11 @@ async def modify_faq(
         refined_query = refined_query_response.content.strip()
 
         # Perform Web Search and Knowledge Base Search
-        kb_tool = kb_qdrant_tool  # Assuming kb_qdrant_tool is defined globally
-        web_tool = WebTrustedSearchTool()  # Assuming WebTrustedSearchTool is defined globally
-        web_response = "Web search disabled"
-        with ThreadPoolExecutor() as executor:
-            kb_future = executor.submit(kb_tool.run, refined_query, 10)
-            kb_response = kb_future.result()
-            if x_web_search:
-                web_future = executor.submit(web_tool.run, query=refined_query, trust=True, read_content=True, top_k=20)
-                web_response = web_future.result()
+        refined_query_response = llm.invoke(refine_prompt)
+        refined_query = refined_query_response.content.strip()
+
+        tool = ContextFusionTool()
+        context_response=tool.run(question=refined_query)
 
         # Modify the FAQ using the refined query and search results
         prompt = f"""
@@ -273,11 +327,8 @@ async def modify_faq(
             A search was carried out for the feedback with the refined query:
             "{refined_query}"
 
-            The web search returned the following results. Use this information to enhance the FAQ wherever relevant:
-            "{web_response}"
-            
-            The knowledge base search returned the following results. Use this information to enhance the FAQ wherever relevant:
-            "{kb_response}"
+            The web search and knowledge base returned the following results. Use this information to enhance the FAQ wherever relevant:
+            "{context_response}"
 
             Chat history for context:
             ```{messages}```

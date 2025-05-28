@@ -9,7 +9,7 @@ import os
 import time
 from langchain_openai import ChatOpenAI
 from urllib.parse import urlencode, urlparse
-from tools.web_search.whitelisted_sites import whitelisted_domain_list
+from tools.web_search.whitelisted_sites import whitelisted_domain_list, onefinance_whitelisted_sites
 from dotenv import load_dotenv
 
 load_dotenv() 
@@ -21,6 +21,7 @@ class WebSearchQuerySchema(BaseModel):
     trust: bool = Field(True, description="Whether to search on trusted sites more.")
     read_content: bool = Field(False, description="Whether to read top sites' article content or not.")
     top_k: int = Field(20, description="Number of top results to fetch from the search engine.")
+    onef_search: bool = Field(False, description="Whether to search on OneF sites only or not. If true, it will search on 1F and return the results.")
 
 class WebTrustedSearchTool(BaseTool):
     name: str = "Web Trusted Search Tool"
@@ -145,6 +146,35 @@ class WebTrustedSearchTool(BaseTool):
                 selected.append(domain)
 
         return selected
+    
+    def _choose_onef_domains(self, query: str) -> List[str]:
+        prompt = (
+            f"You are helping a researcher identify the most relevant company websites to search.\n"
+            f"Query: {query}\n"
+            f"Here is a list of approved domains:\n{chr(10).join(onefinance_whitelisted_sites)} and their information:\n\n"
+            """Below is a list of trusted, whitelisted sources and the types of data they provide:
+            ---"",
+
+            # Research & education platform for all macro indicators of India (indiamacroindicators.co.in)
+            # Research and education platform for all cryptos with crypto scoring & ranking (indiacryptoresearch.co.in)
+            # AI driven tax education and advisory (planmytax.ai)
+            # Education and P2P as an asset offering (1financep2p.com)
+            # Physical only magazine which features primary research, interviews we do related to financial industry (1financemagazine.com)
+            # Community event to rasie awareness and bring together all personal finance related professionals (gfpsummit.com)
+            # Community to bring together advisor's through stories who have shown high integrity and client first approach (fintegritystories.com)
+            # Community to bring together HR's who care about employee wellness - mental and financial (indiahrconclave.com)
+            """
+            f"Pick the top 2 most likely to contain helpful info for this context. "
+            f"Return ONLY the domain names."
+        )
+        response = llm.invoke(prompt)
+        selected = []
+        for domain in onefinance_whitelisted_sites:
+            if domain.lower() in response.content.lower():
+                selected.append(domain)
+
+        return selected
+
 
     def calculate_relevance_score(self, result: Dict[str, Any], query: str) -> int:
         try:
@@ -195,6 +225,10 @@ class WebTrustedSearchTool(BaseTool):
                     if whitelisted_domain in domain:
                         score += 30
                         break
+                for whitelisted_domain in onefinance_whitelisted_sites:
+                    if whitelisted_domain in domain:
+                        score += 25
+                        break
 
             return score
         except Exception:
@@ -215,14 +249,21 @@ class WebTrustedSearchTool(BaseTool):
                 })
         return results
 
-    def _run(self, query: str, trust:bool, read_content:bool, top_k:int) -> Dict[str, Any]:
+    def _run(self, query: str, trust:bool, read_content:bool, top_k:int, onef_search: bool) -> Dict[str, Any]:
         """Search Brave Search with a freeform query and fetch content from top 5 sites."""
+        # print("Running web search tool with query:", query)
         brave_instance = "https://api.search.brave.com"
-        selected_domains=[]
+        selected_domains=[""]
+        
         if trust:
-            selected_domains = self._choose_relevant_domains(query)
-            
-        selected_domains.append("")
+            selected_domains.extend(self._choose_relevant_domains(query))
+            selected_domains.remove("")
+
+        if onef_search:
+            selected_domains.extend(self._choose_onef_domains(query))
+            selected_domains.append("1finance.co.in")
+            if "" in selected_domains:
+                selected_domains.remove("")
 
         results = []
         for domain in selected_domains:

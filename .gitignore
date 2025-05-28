@@ -4,5 +4,5 @@ vector_store/
 __pycache__/
 venv/
 db/
-test/
+temp/
 ftenv/

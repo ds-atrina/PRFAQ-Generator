@@ -4,6 +4,7 @@ import asyncio
 import re
 import pandas as pd
 from crewai import LLM
+from langchain_openai import ChatOpenAI
 
 def extract_text_from_pdf(pdf_file) -> str:
     """Extract text from a PDF file using PyMuPDF (fitz)."""
@@ -22,12 +23,13 @@ def remove_links(text):
     return re.sub(pattern, '', text)
 
 def get_openai_llm():
-    return LLM(
-        model="openai/o3-mini",
-        reasoning_effort = "medium",
-        temperature=0.2,        
-        seed=42
-    )
+    return ChatOpenAI(model="o3-mini", temperature=1, stop=None)
+    # return LLM(
+    #     model="openai/o3-mini",
+    #     reasoning_effort = "medium",
+    #     temperature=0.2,        
+    #     seed=42,
+    # )
 
 def render_text_or_table_to_str(text_or_data):
     """
@@ -40,3 +42,12 @@ def render_text_or_table_to_str(text_or_data):
         else:
             return '\n'.join(f"- {item}" for item in text_or_data)
     return text_or_data
+
+def convert_to_json(response):
+    response_text = response.replace("```json","").replace("```","").strip()
+
+    try:
+        updated_faq = json.loads(response_text)
+        return updated_faq
+    except json.JSONDecodeError as e:
+        return {}

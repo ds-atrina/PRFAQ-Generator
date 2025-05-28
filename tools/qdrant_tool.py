@@ -2,8 +2,7 @@ import os
 from functools import wraps
 from openai import OpenAI
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance
-from qdrant_client.http.models import PointStruct, VectorParams
+from tools.web_search.web_search import WebTrustedSearchTool
 import uuid
 from crewai.tools import BaseTool
 from dotenv import load_dotenv
@@ -44,13 +43,14 @@ def qdrant_tool(question: str, top_k:int) -> str:
 
 class QdrantTool(BaseTool):
     def __init__(self):
-        super().__init__(name="QdrantTool", description="A tool for querying the 1Finance knowledge base.")
+        super().__init__(name="QdrantTool", description="A tool for querying the 1Finance knowledge base and company sites and blogs.")
 
-    def _run(self, question: str, top_k:int) -> str:
-        return qdrant_tool(question, top_k)
-
-    def _arun(self, *args, **kwargs):
-        raise NotImplementedError("Async execution is not supported for this tool.")
+    def _run(self, question: str, top_k:int = 5) -> dict:
+        return {
+            "knowledge_base": qdrant_tool(question, top_k),
+            # "1f_sites": WebTrustedSearchTool()._run(
+            # query=question, trust=False, read_content=True, top_k=5, onef_search=True)
+        }
 
 # Initialize the tool instance
 kb_qdrant_tool = QdrantTool()

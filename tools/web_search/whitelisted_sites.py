@@ -1,3 +1,41 @@
+whitelisted_domain_list = [
+    "sebi.gov.in",
+    "ceicdata.com",
+    "statistics.world-exchanges.org",
+    "nseindia.com",
+    "bseindia.com",
+    "rbi.org.in",
+    "ibef.org",
+    "economicoutlook.cmie.com",
+    "irdai.gov.in",
+    "incometaxindia.gov.in",
+    "incometax.gov.in",
+    "gst.gov.in",
+    "gstcouncil.gov.in",
+    "amfiindia.com",
+    "mospi.gov.in",
+    "bls.gov",
+    "siam.in",
+    "eaindustry.nic.in",
+    "dpiit.gov.in",
+    "esankhyiki.mospi.gov.in",
+    "tradestat.commerce.gov.in",
+    "apmiindia.org",
+    "data.rbi.org.in",
+    "indiapassivefunds.com"
+]
+
+onefinance_whitelisted_sites = [
+    "indiamacroindicators.co.in",
+    "indiacryptoresearch.co.in",
+    "planmytax.ai",
+    "1financep2p.com",
+    "1financemagazine.com",
+    "gfpsummit.com",
+    "fintegritystories.com",
+    "indiahrconclave.com"
+]
+
 whitelisted_site_list = [
     "https://www.sebi.gov.in/sebiweb/other/OtherAction.do?doPmr=yes",
     "https://www.sebi.gov.in/statistics/fpi-investment.html",
@@ -69,39 +107,3 @@ whitelisted_site_list = [
     "https://dea.gov.in/",
     "https://www.rbi.org.in/"
     ]
-
-whitelisted_domain_list = [
-    "sebi.gov.in",
-    "ceicdata.com",
-    "statistics.world-exchanges.org",
-    "nseindia.com",
-    "bseindia.com",
-    "rbi.org.in",
-    "ibef.org",
-    "economicoutlook.cmie.com",
-    "irdai.gov.in",
-    "incometaxindia.gov.in",
-    "incometax.gov.in",
-    "gst.gov.in",
-    "gstcouncil.gov.in",
-    "amfiindia.com",
-    "mospi.gov.in",
-    "bls.gov",
-    "siam.in",
-    "eaindustry.nic.in",
-    "dpiit.gov.in",
-    "esankhyiki.mospi.gov.in",
-    "tradestat.commerce.gov.in",
-    "apmiindia.org",
-    "data.rbi.org.in",
-    "indiapassivefunds.com",
-    "1finance.co.in",
-    "indiamacroindicators.co.in",
-    "indiacryptoresearch.co.in",
-    "planmytax.ai",
-    "1financep2p.com",
-    "1financemagazine.com",
-    "gfpsummit.com",
-    "fintegritystories.com",
-    "indiahrconclave.com"
-]
