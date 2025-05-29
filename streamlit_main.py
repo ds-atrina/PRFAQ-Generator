@@ -84,7 +84,7 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
     refined_query = refined_query_response.content.strip()
 
     tool = ContextFusionTool()
-    context_response=tool.run(question=refined_query)
+    context_response=tool.run(question=refined_query, use_websearch=True)
     
     print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")
 
@@ -149,7 +149,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
     refined_query = refined_query_response.content.strip()
 
     tool = ContextFusionTool()
-    context_response=tool.run(question=refined_query)
+    context_response=tool.run(question=refined_query, use_websearch=True)
     
     print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")        
 
@@ -259,15 +259,9 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
         ```{existing_faq}```
     """
     response = llm.invoke(prompt)
-    response_text = str(response.content)
-    response_text = response_text.replace("```json","").replace("```","").strip()
 
-    try:
-        updated_faq = json.loads(response_text)
-        return updated_faq
-    except json.JSONDecodeError as e:
-        st.error(f"Failed to parse the updated PR FAQ: {e}")
-        return existing_faq
+    updated_faq = convert_to_json(response.content)
+    return updated_faq
     
 MAX_FILES = 5
 MAX_FILE_SIZE_MB = 25

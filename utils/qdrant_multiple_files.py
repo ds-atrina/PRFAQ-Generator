@@ -1,5 +1,4 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import OpenAIEmbeddings
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import PointStruct
 import os

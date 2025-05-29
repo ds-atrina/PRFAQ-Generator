@@ -7,16 +7,13 @@ from bs4 import BeautifulSoup
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-
 class FixedScrapeWebsiteToolSchema(BaseModel):
     """Input for ScrapeWebsiteTool."""
-
 
 class ScrapeWebsiteToolSchema(FixedScrapeWebsiteToolSchema):
     """Input for ScrapeWebsiteTool."""
 
     website_url: str = Field(..., description="Mandatory website url to read the file")
-
 
 class ScrapeWebsiteTool(BaseTool):
     name: str = "Read website content"

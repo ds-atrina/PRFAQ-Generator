@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Type
 from tools.qdrant_tool import kb_qdrant_tool
 from tools.web_search.web_search import WebTrustedSearchTool  
-from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
 import json

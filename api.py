@@ -311,7 +311,7 @@ async def modify_faq(
         refined_query = refined_query_response.content.strip()
 
         tool = ContextFusionTool()
-        context_response=tool.run(question=refined_query)
+        context_response=tool.run(question=refined_query, use_websearch=x_web_search.lower() == 'true')
 
         # Modify the FAQ using the refined query and search results
         prompt = f"""

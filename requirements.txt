@@ -12,3 +12,4 @@ setuptools
 supabase
 postgrest
 langgraph
+mcp

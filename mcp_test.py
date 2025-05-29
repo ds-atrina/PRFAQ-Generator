@@ -1,4 +1,3 @@
-import sys
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 from tools.web_search.web_search import WebTrustedSearchTool

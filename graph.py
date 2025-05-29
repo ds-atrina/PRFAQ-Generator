@@ -93,8 +93,8 @@ def generate_content_node(state: State, streaming_callback) -> State:
     kb_content = state.get("kb_content", "")
     web_scrape_content = state.get("web_scrape_content", "")
     reference_doc_content = state.get("extracted_reference_doc_content", "")
-    query=llm.invoke(f"""Generate a query to find competitors for the topic {topic} solving the problem of {problem} with solution {solution}. 
-                        Give only the query as output without any extra text. eg. competitors document moderation system financial document handling moderation images text safe compliance parser""")
+    query=llm.invoke(f"""Generate a query to find the top competitors for the topic {topic} solving the problem of {problem} with solution {solution}. 
+                        Give only the query as output without any extra text. eg. top competitors document moderation system financial document handling moderation images text safe compliance parser""")
     
     web_tool = WebTrustedSearchTool()
     competitor_results = web_tool._run(query=query.content, trust=False,read_content=False, top_k=20, onef_search=False)

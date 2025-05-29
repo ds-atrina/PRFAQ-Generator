@@ -8,7 +8,7 @@ import re
 import os
 import time
 from langchain_openai import ChatOpenAI
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlparse
 from tools.web_search.whitelisted_sites import whitelisted_domain_list, onefinance_whitelisted_sites
 from dotenv import load_dotenv
 

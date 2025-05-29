@@ -1,9 +1,7 @@
 import fitz  # PyMuPDF
 import json
-import asyncio
 import re
 import pandas as pd
-from crewai import LLM
 from langchain_openai import ChatOpenAI
 
 def extract_text_from_pdf(pdf_file) -> str:

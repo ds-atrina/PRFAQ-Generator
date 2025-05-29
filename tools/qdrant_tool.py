@@ -3,7 +3,6 @@ from functools import wraps
 from openai import OpenAI
 from qdrant_client import QdrantClient
 from tools.web_search.web_search import WebTrustedSearchTool
-import uuid
 from crewai.tools import BaseTool
 from dotenv import load_dotenv
 
@@ -48,8 +47,8 @@ class QdrantTool(BaseTool):
     def _run(self, question: str, top_k:int = 5) -> dict:
         return {
             "knowledge_base": qdrant_tool(question, top_k),
-            # "1f_sites": WebTrustedSearchTool()._run(
-            # query=question, trust=False, read_content=True, top_k=5, onef_search=True)
+            "1f_sites": WebTrustedSearchTool()._run(
+            query=question, trust=False, read_content=True, top_k=5, onef_search=True)
         }
 
 # Initialize the tool instance
