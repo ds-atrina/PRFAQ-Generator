@@ -4,7 +4,7 @@ from typing import Any, Optional, Type
 
 import requests
 from bs4 import BeautifulSoup
-from crewai.tools import BaseTool
+from tools.base_tool.base_tool import BaseTool
 from pydantic import BaseModel, Field
 
 class FixedScrapeWebsiteToolSchema(BaseModel):

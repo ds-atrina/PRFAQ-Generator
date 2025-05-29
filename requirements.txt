@@ -1,10 +1,8 @@
 pymupdf
-crewai   #crewai==0.76.9
 streamlit==1.28.1
 langchain
 langchain-openai==0.2.6
 langchain-community
-crewai-tools   #crewai-tools==0.13.4
 python-docx
 qdrant-client
 pysqlite3-binary

@@ -1,16 +1,15 @@
-from crewai.tools import BaseTool
+from tools.base_tool.base_tool import BaseTool
 from pydantic import BaseModel, Field
 from typing import Dict, List, Type
 from tools.qdrant_tool import kb_qdrant_tool
 from tools.web_search.web_search import WebTrustedSearchTool  
 import logging
-import os
 import json
-from langchain_openai import ChatOpenAI  
+from utils.utils import get_openai_llm
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+llm = get_openai_llm()
 
 # Define the input schema
 class ContextFusionInputSchema(BaseModel):

@@ -21,13 +21,11 @@ def remove_links(text):
     return re.sub(pattern, '', text)
 
 def get_openai_llm():
-    return ChatOpenAI(model="o3-mini", temperature=1, stop=None)
-    # return LLM(
-    #     model="openai/o3-mini",
-    #     reasoning_effort = "medium",
-    #     temperature=0.2,        
-    #     seed=42,
-    # )
+    return ChatOpenAI(
+        model="o3-mini", 
+        temperature=1, 
+        timeout=120
+    )
 
 def render_text_or_table_to_str(text_or_data):
     """

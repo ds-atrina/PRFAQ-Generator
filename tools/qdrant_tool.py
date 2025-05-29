@@ -3,7 +3,7 @@ from functools import wraps
 from openai import OpenAI
 from qdrant_client import QdrantClient
 from tools.web_search.web_search import WebTrustedSearchTool
-from crewai.tools import BaseTool
+from tools.base_tool.base_tool import BaseTool
 from dotenv import load_dotenv
 
 load_dotenv()
