@@ -157,3 +157,5 @@ Contains lists of trusted domains and specific URLs for web searches.
 ## Notes
 
 This system uses a multi-agent approach with CrewAI to generate comprehensive PR/FAQ documents. The architecture follows a modular design with UI, orchestration, agent, and task layers working together. The system integrates with external services for knowledge retrieval and web search, ensuring information is gathered from trusted sources.
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ds-atrina/PRFAQ-Generator)
