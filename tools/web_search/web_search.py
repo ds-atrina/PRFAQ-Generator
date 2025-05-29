@@ -7,14 +7,14 @@ import datetime
 import re
 import os
 import time
-from utils.utils import get_openai_llm  
+from langchain_openai import ChatOpenAI
 from urllib.parse import urlparse
 from tools.web_search.whitelisted_sites import whitelisted_domain_list, onefinance_whitelisted_sites
 from dotenv import load_dotenv
 
 load_dotenv() 
 
-llm = get_openai_llm()
+llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 class WebSearchQuerySchema(BaseModel):
     query: str = Field(..., description="Search query to find relevant information.")

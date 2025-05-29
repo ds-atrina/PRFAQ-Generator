@@ -1,4 +1,4 @@
-from prompt.constants import onefinance_guidelines
+from prompt.constants import onefinance_guidelines, onefinance_info
 
 def CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_doc_content, web_scrape_content, kb_content, competitor_results):
     return f"""Generate a detailed PR FAQ introduction in JSON format for the topic ```{topic}```, leveraging the following provided information and enhancing them if necessary :
@@ -6,25 +6,27 @@ def CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_
         2. The problem we are trying to tackle: ```{problem}```
         3. The solution to the problem or the features of the offering: ```{solution}```
         4. The chat history: ```{chat_history}```
-        4. The extracted information from reference document (if available): {reference_doc_content}
-        5. The web-scraped information (if available) and how it is relevant to 1 Finance's new offering: {web_scrape_content}
-        6. Any relevant information extracted from the knowledge base: {kb_content}
-        7. The competitors and their URLs: {competitor_results}
+        5. The extracted information from reference document (if available): {reference_doc_content}
+        6. The web-scraped information (if available) and how it is relevant to 1 Finance's new offering: {web_scrape_content}
+        7. Any relevant information extracted from the knowledge base: {kb_content}
+        8. The competitors and their URLs: {competitor_results}
 
         ONLY USE INFORMATION PRESENT IN THE KNOWLEDGE BASE DO NOT MAKE UP INFORMATION.
         Use the web search tool to search for competitors and market research for popular products solving the same problem and their urls. Set trust to false, read_content to false and top_k as 20.
         Ensure that no specific dates, names, or locations are mentioned—use placeholders instead—and follow the provided JSON template exactly.
 
+        You work for 1 Finance. {onefinance_info}
         Follow these additional writing and content guidelines of 1 Finance while generating the output:
         {onefinance_guidelines}
+
         OUTPUT FORMAT IN STRICT JSON:
         {{
-        "Title": "1 FINANCE ANNOUNCES XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
-        "Subtitle": "The subtitle reframes the headline solution. Write one sentence about the benefits.",
-        "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
-        "ProblemStatement": "3-4 sentences describing the problems this product/feature plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
-        "Solution": "3-5 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
-        "Competitors": [{{"name": "Company name or Product name", "url":"URL of the product website"}}] [LIST OF GENUINE COMPANIES/PRODUCTS JSON (don't make up names or URLs or use blogs)],
+            "Title": "1 FINANCE ANNOUNCES XXX TO ENABLE XXX TO OBTAIN/HAVE XXX.",
+            "Subtitle": "The subtitle reframes the headline solution. Write one sentence about the benefits.",
+            "IntroParagraph": "[Location] - [Launch Date] - 2-4 sentences that gives a summary of the product and the benefits. Should be self-contained so that a person could read only this paragraph and still understand the new product/feature.
+            "ProblemStatement": "3-4 sentences describing the problems this product/feature plans to solve and briefly describe the problem and its negative impact. This section tests your assumptions about the pain-points that you are addressing.",
+            "Solution": "3-5 sentences describing how the new product/feature addresses these problems. For more complex products/features, you may need more than one paragraph. This section tests your assumptions about how you are solving the pain-points.",
+            "Competitors": [{{"name": "Company name or Product name", "url":"URL of the product website"}}] [LIST OF GENUINE COMPANIES/PRODUCTS JSON (don't make up names or URLs or use blogs)],
         }}
     """
 
@@ -64,8 +66,19 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
         
         UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
 
-        While generating the FAQs and answers, follow these stylistic and tone guidelines:
+        You work for 1 Finance. {onefinance_info}
+        While generating the FAQs and answers, follow these stylistic and tone guidelines of 1 Finance:
         {onefinance_guidelines}
+
+        STRICT RULES:
+        - NO overlapping, duplicate, or semantically similar questions.
+        - Exhaustive coverage without repetition.
+        - Format output as JSON with "internal_questions" and "external_questions" as two arrays of strings.
+
+        **Formatting Guidelines:**:
+        - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table:", "Example of Markdown table:", "A markdown formatted table illustrates this:" or any similar wording.
+        - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
+        **Ensure the above rules are strictly followed without exception.**
 
         EXPECTED OUTPUT IN JSON:
         {{
@@ -78,7 +91,6 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
                 ...
             ]
         }}"""
-    prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_doc_content, web_scrape_content, generated_content, response)
 
 def ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, web_scrape_content, reference_doc_content):
     return f""" You are generating the PR/FAQ document for the topic `{topic}`, problem statement {problem} and solution {solution}.
@@ -87,21 +99,40 @@ def ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, w
     If a question does not have an answer in the knowledge base or web, use the output from the web scrape extraction task and the extract info task to answer the question.
     Web scrape content: ```{web_scrape_content}```
     Reference document content: ```{reference_doc_content}```
-    The last resort should be using the generated content to frame an answer that is consistent with the other content of the PR/FAQ.
+    
+    Important Prioritisation for Answering Each Question:
+      - Always follow this strict order of sourcing:
+        1. **First**, use relevant information from the Knowledge Base. This should be the Primary sources for answering the question.
+        2. **Second**, if the quesion requires latest or non-1 Finance related information, use the output of Web Search to construct the response. This will only happen if use_websearch was set to True by the user.
+        3. **Third**,  You can also use the output of extract_info_task and/or the output of web_scrape_extraction_task to answer the question.
+        4. **Finally**, if no proper answer was found in any of these sources, generate original content independently — ensuring strict factual accuracy and consistency with the remaining output, based only on verified information.
+    
+    ANSWERS SHOULD BE EXTREMELY DETAILED, ALL-INFORMING AND WELL-FORMATTED. USE THESE SOURCES IN THIS ORDER TO GENERATE ACCURATE ANSWERS. IT IS POSSIBLE THAT AN ANSWER IS PRESENT IN MULTIPLE SOURCES, SO FRAME THE ANSWERS PROPERLY ACCORDING TO THE CONTEXT OF THE QUESTION.
+    UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
+
     Answer each question on the basis of this information and priority, framing it properly with proper formatting.
     **Important Considerations to be followed STRICTLY:**
-      - Include clearly marked sub-points or bullet points (using string "\n-") or bold or italics for clarity. 
-      - Include examples, step-by-step guidance, markdown-formatted tables where applicable.
-      - **Do not** repeat the same ideas.
-      - It is possible that the answer is not present in the knowledge base, web search, web scrape, extract info task or generated content. In that case, the answer should be generated based on available information from trusted sources and maintain consistency throuhgout the document.
-    
+      - Include examples, step-by-step guidance, markdown-formatted tables where applicable
+      - Include clearly marked sub-points or bullet points (using strings like "\n-") or bold or italics for clarity. 
+      - Answer the question with specific, unique, and non-interchangeable sentences. Avoid generic or modular statements that could fit into other unrelated answers. Every sentence must be tightly connected to the context of this question only.
+      - Answer the question clearly and precisely. Strictly avoid using jargon or generic phrases like 'state-of-the-art', 'leverage', 'cutting-edge', or any similar buzzwords. Use simple, specific language grounded in the actual context.
+      - Do not include any of the following words in the answer or any headings: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
+      - **Do not** repeat the same ideas in slightly different wording.
+
     UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION FROM GIVEN CONTEXT OF KNOWLEDGE BASE, WEB SEARCH, WEB SCRAPING TASK AND EXTRACT INFO TASK.
     ANSWERS SHOULD BE EXTREMELY DETAILED, ALL-INFORMING AND WELL-FORMATTED.
     Add a user response field as a reply to what the user requested for in terms of modifications or generation: ```{chat_history[-1]}```.
     So UserResponse should be the reply that will be shown to the user as a response to their request for generating the PR/FAQ document along with the document.
 
-    While generating the FAQs and answers, follow these stylistic and tone guidelines:
+    You are a meticulous knowledge integration expert and a Senior Product Manager with over 10 years of experience across financial and cross-industry products and services. 
+    With deep domain understanding of finance and a first-principles mindset inspired by critical thinkers like Steve Jobs, you approach every question with rigour and clarity. 
+    You know how to craft answers that are not just technically sound, but also strategically complete — ensuring that every response addresses the question holistically, from problem framing to implications. 
+    You combine internal and external context into well-structured, credible, and informative answers that never hallucinate and always preserve factual accuracy. You know how to handle markdown tables and bullet points naturally.
+    Your goal is to ensure that every answer is exhaustive, precise, markdown-formatted, free of ambiguity and devoid of any jargons or unnecessary adjectives for both internal stakeholders and external customers.
+    You work for 1 Finance. {onefinance_info}
+    While generating the FAQs and answers, follow these stylistic and tone guidelines of 1 Finance:
     {onefinance_guidelines}
+
     EXPECTED OUTPUT FORMAT IN JSON:   
     {{
     "InternalFAQs": [

@@ -11,3 +11,5 @@ supabase
 postgrest
 langgraph
 mcp
+beautifulsoup4
+fastapi

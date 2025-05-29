@@ -17,3 +17,5 @@ onefinance_guidelines = """CONTENT GUIDELINES:
         - Stick to facts and maintain a respectful dialogue.
         - Balance tone to maintain friendliness, kindness, and confidence.
         """
+onefinance_info = f"""1 Finance is a modern personal finance institution that helps individuals achieve financial independence and well-being through personalized, commission-free advisory services. Leveraging behavioral insights and technology, it offers tailored financial plans, holistic assessments, and expert guidance. 
+    Backed by the Marwadi Chandarana Group, 1 Finance combines decades of financial expertise with a client-first approach."""

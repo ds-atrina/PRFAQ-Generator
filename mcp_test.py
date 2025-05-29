@@ -26,7 +26,7 @@ try:
     @mcp.tool(name="scrape_website_tool", description="Scrapes content from a specified website URL")
     def scrape_website_tool(website_url: str) -> dict:
         tool = ScrapeWebsiteTool()
-        return tool._run(website_url=website_url)
+        return tool._run(website_url=website_url) #yaha pe chuti
 except Exception as tool_reg_err:
     raise
 app = mcp.sse_app()

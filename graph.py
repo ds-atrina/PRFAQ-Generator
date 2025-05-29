@@ -18,11 +18,11 @@ def stream_thinking_step(state: State, step: str, detail: str, streaming_callbac
     Optionally stream the current thinking step to frontend via a callback.
     """
     thinking_data = {"step": step, "detail": detail}
-    # Store for later (for tracing in the final state)
+
     if "thinking_steps" not in state:
         state["thinking_steps"] = []
     state["thinking_steps"].append(thinking_data)
-    # Optionally stream it
+
     if streaming_callback:
         streaming_callback(thinking_data)
 
@@ -43,6 +43,7 @@ def kb_retrieval_node(state: State, streaming_callback) -> State:
 
     prompt = f"Extract key info from the following knowledge base content on '{topic}', problem statement '{problem}' and solution '{solution}':\n{kb_content}"
     extracted = llm.invoke(prompt)
+    print(f"\n\nExtracted KB Content: {extracted.content}")
     return {**state, "kb_content": extracted.content}
 
 
@@ -67,6 +68,7 @@ def web_scrape_node(state: State, streaming_callback) -> State:
     stream_thinking_step(state, "web_scrape", f"Extracting info from scraped content...", streaming_callback)
     prompt = f"Extract key info from the following scraped web content on '{topic}', problem statement '{problem}' and solution '{solution}':\n{scrape_results}"
     extracted = llm.invoke(prompt)
+    print(f"\n\nExtracted Web Scrape Content: {extracted.content}")
     return {**state, "web_scrape_content": extracted.content}
 
 
@@ -79,6 +81,7 @@ def extract_info_node(state: State, streaming_callback) -> State:
     solution = state.get("solution", "Default Solution")
     prompt = f"Extract key info from the following scraped web content on '{topic}', problem statement '{problem}' and solution '{solution}':\n{reference_doc}"
     extracted = llm.invoke(prompt)
+    print(f"\n\nExtracted Reference Document Content: {extracted.content}")
     return {**state, "extracted_reference_doc_content": extracted.content}
 
 
@@ -102,7 +105,7 @@ def generate_content_node(state: State, streaming_callback) -> State:
     prompt = CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_doc_content, web_scrape_content, kb_content, competitor_results)
     result = llm.invoke(prompt)
     result = convert_to_json(result.content)
-    print(f"Generated PR/FAQ Content: {result}")
+    print(f"\n\nGenerated PR/FAQ Content: {result}")
     stream_thinking_step(state, "generate_content", "PR/FAQ introduction generated.", streaming_callback)
     return {**state, "generated_content": result}
 
@@ -146,6 +149,7 @@ def answer_faq_node(state: State, streaming_callback) -> State:
             logging.info(f"Processed question: {future.result()}")
 
     response= "\n\n".join(results)
+    print(f"\n\nGenerated FAQ Answer Context: {response}")
     
     prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, web_scrape_content, reference_doc_content)
     response = llm.invoke(prompt)
@@ -204,16 +208,3 @@ def start_langgraph(inputs, streaming_callback):
 
 def print_streaming_callback(data):
     print(f"[STEP] {data['step']}: {data['detail']}")
-
-# === Run the graph ===
-
-if __name__ == "__main__":
-    inputs = {
-        "topic": "Generative AI PR Tool",
-        "problem": "Manual FAQ generation is slow",
-        "solution": "Automated LangGraph-based generator",
-        "reference_doc_content": "...",
-        "web_scraping_links": "https://example.com, https://another.com",
-        "chat_history": ["Generate this PR/FAQ for me"],
-        "use_websearch": True,
-    }

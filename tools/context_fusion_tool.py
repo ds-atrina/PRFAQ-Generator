@@ -4,12 +4,13 @@ from typing import Dict, List, Type
 from tools.qdrant_tool import kb_qdrant_tool
 from tools.web_search.web_search import WebTrustedSearchTool  
 import logging
+import os
 import json
-from utils.utils import get_openai_llm
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = get_openai_llm()
+llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 # Define the input schema
 class ContextFusionInputSchema(BaseModel):

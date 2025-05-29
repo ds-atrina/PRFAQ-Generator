@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Header
+from fastapi import HTTPException, Header, Depends, APIRouter
 from pydantic import BaseModel
 from typing import Optional, List
 from langchain_openai import ChatOpenAI  
@@ -12,7 +12,7 @@ import json
 from dotenv import load_dotenv
 load_dotenv()
 
-from servers.app import app
+from servers.mainapp import authenticate
 
 from graph import start_langgraph
 
@@ -25,6 +25,8 @@ from supabase import create_client
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+router = APIRouter()
 
 # Pydantic model for request body
 class Request(BaseModel):
@@ -136,13 +138,14 @@ def fetch_space_documents(spaceid: str, chatid: Optional[str]):
 
     return merged_content.strip()
 
-@app.post("/generate-prfaq", response_model=PRFAQResponse)
+@router.post("/generate", response_model=PRFAQResponse)
 async def generate_prfaq(
     request: Request,
     x_space_id: str = Header(..., alias="x-space-id", description="Space ID for which the PR FAQ needs to be generated"),
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id", description="Thread ID for tracking the request"),
     x_command: Optional[str] = Header(None, alias="x-command", description="Command in use"),
-    x_web_search: Optional[str] = Header("False", alias="x-web-search", description="Boolean flag to use web search")
+    x_web_search: Optional[str] = Header("False", alias="x-web-search", description="Boolean flag to use web search"),
+    user: str = Depends(authenticate)
 ):
     """
     Generate a PR FAQ for a given spaceid by fetching data from the Supabase database.
@@ -198,13 +201,14 @@ def sse_format(data, event=None):
     prefix = f"event: {event}\n" if event else ""
     return f"{prefix}data: {json.dumps(data)}\n\n"
 
-@app.post("/generate-prfaq-logs")
+@router.post("/logging")
 async def generate_prfaq_logs(
     request: Request,
     x_space_id: str = Header(..., alias="x-space-id"),
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id"),
     x_command: Optional[str] = Header(None, alias="x-command"),
     x_web_search: Optional[str] = Header("False", alias="x-web-search"),
+    user: str = Depends(authenticate),
 ):
     """
     SSE Streaming endpoint for PRFAQ generation.
@@ -262,13 +266,14 @@ async def generate_prfaq_logs(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
-@app.post("/modify-prfaq", response_model=PRFAQResponse)
+@router.post("/modify", response_model=PRFAQResponse)
 async def modify_faq(
     request: ModifyRequest,
     x_space_id: str = Header(..., alias="x-space-id", description="Space ID for which the modification is being performed"),
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id", description="Thread ID for tracking the request"),
     x_command: Optional[str] = Header(None, alias="x-command", description="Command in use"),
-    x_web_search: Optional[str] = Header("False", alias="x-web-search", description="Boolean flag to use web search")
+    x_web_search: Optional[str] = Header("False", alias="x-web-search", description="Boolean flag to use web search"),
+    user: str = Depends(authenticate),
 ):
     """
     Modify an existing PR FAQ based on user feedback and additional context.
