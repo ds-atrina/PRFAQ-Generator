@@ -12,8 +12,9 @@ import time
 import openai
 from utils.utils import extract_text_from_pdf, render_text_or_table_to_str, convert_to_json
 from langchain_openai import ChatOpenAI  
+from tools.qdrant_tool import kb_qdrant_tool
+from tools.web_search.web_search import WebTrustedSearchTool
 from graph import start_langgraph
-from tools.context_fusion_tool import ContextFusionTool
 
 
 # Ensure `src/` is in the Python path
@@ -83,10 +84,18 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
 
-    tool = ContextFusionTool()
-    context_response=tool.run(question=refined_query, use_websearch=True)
+    kb_response = kb_qdrant_tool.run(refined_query)
+
+    web_tool = WebTrustedSearchTool()
+    web_response = web_tool.run(
+        query=refined_query,
+        trust=True,
+        read_content=False,
+        top_k=5,
+        onef_search=False
+    )
     
-    print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")
+    # print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")
 
     prompt = f"""You are an intelligent assistant tasked with responding to user response.
 
@@ -102,8 +111,11 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
         A search was carried out for the feedback with the refined query:
         "{refined_query}"
 
-        The response from web search and knowledge base search is as follows:
-        {context_response}
+        The response from knowledge base search is as follows:
+        {kb_response}
+
+        The response from web search is as follows:
+        {web_response}
 
         Here is the chat history for context:
         {json.dumps(chat_history[-6:], indent=4)}
@@ -148,10 +160,18 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
     refined_query_response = llm.invoke(refine_prompt)
     refined_query = refined_query_response.content.strip()
 
-    tool = ContextFusionTool()
-    context_response=tool.run(question=refined_query, use_websearch=True)
+    kb_response = kb_qdrant_tool.run(refined_query)
+
+    web_tool = WebTrustedSearchTool()
+    web_response = web_tool.run(
+        query=refined_query,
+        trust=True,
+        read_content=False,
+        top_k=5,
+        onef_search=False
+    )
     
-    print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")        
+    # print(f"""The context fusion tool returned the following context for query {refined_query}:\n {context_response}""")        
 
     prompt = f"""
         You are an intelligent assistant working at 1Finance tasked with modifying an existing PR FAQ based on user feedback.
@@ -173,8 +193,11 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
         A search was carried out for the feedback with the refined query:
         "{refined_query}"
 
-        The response from web search and knowledge base search is as follows:
-        {context_response}
+        The response from knowledge base search is as follows:
+        {kb_response}
+
+        The response from web search is as follows:
+        {web_response}
 
         Here is the existing PR FAQ:
         ```{existing_faq}```

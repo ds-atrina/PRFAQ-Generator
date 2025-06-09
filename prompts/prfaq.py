@@ -1,7 +1,8 @@
-from prompt.constants import onefinance_guidelines, onefinance_info
+from prompts.constants import onefinance_guidelines, onefinance_info, role_info
 
 def CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_doc_content, web_scrape_content, kb_content, competitor_results):
-    return f"""Generate a detailed PR FAQ introduction in JSON format for the topic ```{topic}```, leveraging the following provided information and enhancing them if necessary :
+    return f"""{role_info}
+        Generate a detailed PR FAQ introduction in JSON format for the topic ```{topic}```, leveraging the following provided information and enhancing them if necessary :
         1. The topic on which FAQ is to be generated: ``{topic}```
         2. The problem we are trying to tackle: ```{problem}```
         3. The solution to the problem or the features of the offering: ```{solution}```
@@ -31,69 +32,105 @@ def CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_
     """
 
 def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
-    return f"""Generate exhaustive and non-redundant internal and external questions about the topic `{topic}`, problem statement `{problem}` and solution `{solution}`, guided by the chat history and existing PRFAQ introduction from content_generation_task.
-        1.**Internal FAQs**: (20 questions) focusing on:
-            - Business rationale, market need and target audience facing the issue
-            - Potential impact on business/Return on Investment (ROI) for the company
-            - Departments and their role in this execution, internal stakeholders, dependencies
-            - Product vision and alignment with company 
-            - Why is this a problem that needs to be solved right now
-            - Technical approach, risks, and scalability
-            - Legal, compliance, and privacy concerns
-            - Resourcing, timeline, and launch readiness
-            - Success metrics and future roadmap
+    return f"""{role_info}
+        You are tasked with generating clear, structured, and **non-redundant Internal and External FAQs** for a PRFAQ document using the inputs below:
 
-        2.**External FAQs**: (20 questions) focusing on:
-            - What the product is and what problems it solves
-            - Who it's for and how it's used and its impact on their lives (how it makes their life better)
-            - Pricing, availability, and onboarding process
-            - Key features and known limitations
-            - Security, privacy, and data handling
-            - Support and future updates
+        - **Topic**: {topic}
+        - **Problem**: {problem}
+        - **Solution**: {solution}
+        - **Chat History (including PRFAQ introduction)**: {chat_history}
 
-        Now from the list of 20 questions each, combine certain questions that are similar or overlapping in nature or may have an answer in a similar vein to make it more concise and relevant.
-        After combining these questions, make sure that the count of questions in each category is around 8-10.
-            
-        To generate more relevant and specific questions use the following information in order of importance:
-        1. Use the problem statement and solution from the output of content_generation_agent and the context from user chat history ```{chat_history}``` to generate relevant questions. 
-        2. Use the information from the output of kb_agent.
-        3. Use the information from the output of web_scrape_extractor and the output of extract_info_agent.
+        ---
 
-        **Important Considerations to be followed STRICTLY:**
-            - THE QUESTIONS SHOULD BE EXHAUSTIVE.
-            - **Do not** repeat the same ideas.
-            - **Do not** introduce REDUNDANT, OVERLAPPING, or unnecessarily similar questions.
-        
-        UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION.
+        ### 🎯 Objective:
+        Create ~9-10 well-structured questions each for:
+        - **Internal FAQs** (for product, engineering, legal, etc.)
+        - **External FAQs** (for customers, partners, press)
 
-        You work for 1 Finance. {onefinance_info}
-        While generating the FAQs and answers, follow these stylistic and tone guidelines of 1 Finance:
+        Each section should follow a logical PRFAQ-style narrative — avoid random ordering.
+
+        ---
+
+        ### 🧠 Step 1: Generate & Combine
+        1. Generate 20 exhaustive questions per section.
+        2. Combine/rephrase overlapping or similar questions (except fixed ones).
+        3. Final output: ~9-10 concise, high-value questions per section.
+
+        ---
+
+        ### 🛑 Mandatory Questions (Rephrasing allowed, but do not remove, combine, or relocate):
+
+        #### Internal (must STRICTLY appear in **Internal FAQs only**):
+        - Who is the target audience for this product who were facing the problem statement?
+        - What is the potential impact on business/Return on Investment (ROI) for the company?
+        - Which departments were involved, are currently involved, or will need to be involved in executing this, and what will their roles be?
+        - Does it align with the company's philosophy?
+
+        #### External (must STRICTLY appear in **External FAQs only**):
+        - How will it impact/make the target audience's life better?
+
+        These questions **must be slightly reframed for clarity** and appear **in random order within their correct section only**.
+
+        ---
+
+        ### 🧾 Structure Guidance
+
+        #### Internal FAQs: 
+        Cover areas like:
+        - Business rationale and market need
+        - Product vision and alignment with company 
+        - Why is this a problem that needs to be solved right now
+        - Technical approach, risks, and scalability
+        - Legal, compliance, and privacy concerns
+        - Resourcing, timeline, and launch readiness
+        - Success metrics and future roadmap
+
+        #### External FAQs:
+        Cover:
+        - How it the product is to be used and how it helps the target audience
+        - What the product is and what problems it solves
+        - Pricing, availability, onboarding
+        - Key features and known limitations
+        - Security, privacy, and data handling
+        - Support and future updates
+
+        ---
+
+        ### ✅ Inputs for Question Generation (in priority order):
+        1. Problem & solution from `content_generation_agent` and chat history
+        2. Output of `kb_agent`
+        3. Output of `web_scrape_extractor` and `extract_info_agent`
+
+        ---
+
+        ### ⚠️ Important Constraints:
+        - Do **not** introduce fabricated or assumed information
+        - Avoid any duplication, overlap, or semantically similar questions
+        - Keep tone aligned with 1 Finance brand:
         {onefinance_guidelines}
 
-        STRICT RULES:
-        - NO overlapping, duplicate, or semantically similar questions.
-        - Exhaustive coverage without repetition.
-        - Format output as JSON with "internal_questions" and "external_questions" as two arrays of strings.
+        You are acting on behalf of **1 Finance**:  
+        {onefinance_info}
 
-        **Formatting Guidelines:**:
-        - Do not include any headings like "Bullet Points:", "Key Bullet Points:", "Markdown table:", "Example of Markdown table:", "A markdown formatted table illustrates this:" or any similar wording.
-        - Do not include any of the following words in the answer: “bullet points”, “markdown table”, “example”, or any descriptive labels referring to the format used.
-        **Ensure the above rules are strictly followed without exception.**
+        ---
 
-        EXPECTED OUTPUT IN JSON:
+        ### ✅ Output Format (JSON):
+        ```json
         {{
-            "internal_questions": [
-                "How does this product align with our Q4 strategic goals?",
-                ...
-            ],
-            "external_questions": [
-                "How can users get started with the new AI assistant?",
-                ...
-            ]
-        }}"""
+        "internal_questions": [
+            "Rephrased internal Q1...",
+            ...
+        ],
+        "external_questions": [
+            "Rephrased external Q1...",
+            ...
+        ]
+        }}
+    """
 
 def ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, web_scrape_content, reference_doc_content):
-    return f""" You are generating the PR/FAQ document for the topic `{topic}`, problem statement {problem} and solution {solution}.
+    return f"""{role_info}
+    You are generating the PR/FAQ document for the topic `{topic}`, problem statement {problem} and solution {solution}.
     You are supposed to generate proper markdown formatted answers for each question based on available information, the answers from KB and web search are as follows: 
     ```{response}```
     If a question does not have an answer in the knowledge base or web, use the output from the web scrape extraction task and the extract info task to answer the question.
@@ -101,12 +138,15 @@ def ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, w
     Reference document content: ```{reference_doc_content}```
     The last resort should be using the generated content to frame an answer that is consistent with the other content of the PR/FAQ.
     Answer each question on the basis of this information and priority, framing it properly with proper formatting.
+    
     **Important Considerations to be followed STRICTLY:**
       - Include clearly marked sub-points or bullet points (using string "\n-") or bold or italics for clarity. 
       - Include examples, step-by-step guidance, markdown-formatted tables where applicable.
+      - Answer the question with specific, unique, and non-interchangeable sentences. Avoid generic or modular statements that could fit into other unrelated answers. Every sentence must be tightly connected to the context of this question only.
+      - Answer the question clearly and precisely. Strictly avoid using jargon or generic phrases like 'state-of-the-art', 'leverage', 'cutting-edge', or any similar buzzwords. Use simple, specific language grounded in the actual context.
       - **Do not** repeat the same ideas.
       - It is possible that the answer is not present in the knowledge base, web search, web scrape, extract info task or generated content. In that case, the answer should be generated based on available information from trusted sources and maintain consistency throuhgout the document.
-    
+      
     UNDER NO CIRCUMSTANCES SHOULD FABRICATED OR ASSUMED CONTENT BE INTRODUCED. ALWAYS PRIORITISE VERIFIABLE, CREDIBLE INFORMATION FROM GIVEN CONTEXT OF KNOWLEDGE BASE, WEB SEARCH, WEB SCRAPING TASK AND EXTRACT INFO TASK.
     ANSWERS SHOULD BE EXTREMELY DETAILED, ALL-INFORMING AND WELL-FORMATTED.
     Add a user response field as a reply to what the user requested for in terms of modifications or generation: ```{chat_history[-1]}```.

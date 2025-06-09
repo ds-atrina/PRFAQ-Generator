@@ -3,21 +3,51 @@ from typing import Dict, Any, Callable
 from utils.utils import remove_links, get_openai_llm, convert_to_json
 from tools.web_search.web_search import WebTrustedSearchTool
 from tools.qdrant_tool import kb_qdrant_tool
-from tools.context_fusion_tool import ContextFusionTool
 from tools.scrape_website_tool import ScrapeWebsiteTool
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
-from prompt.prfaq import CONTENT_GENERATION_PROMPT, QUESTION_GENERATION_PROMPT, ANSWER_GENERATION_PROMPT
+from prompts.prfaq import CONTENT_GENERATION_PROMPT, QUESTION_GENERATION_PROMPT, ANSWER_GENERATION_PROMPT
 
 # --- LangGraph Shared State ---
 State = Dict[str, Any]
 
 def stream_thinking_step(state: State, step: str, detail: str, streaming_callback: Callable = None) -> None:
     """
-    Optionally stream the current thinking step to frontend via a callback.
+    Stream the current thinking step to frontend with AI-generated sub-steps.
     """
-    thinking_data = {"step": step, "detail": detail}
+    llm = get_openai_llm()
+    
+    # Generate thinking steps based on the current function
+    step_prompt = f"""
+    As an AI assistant working on: {detail}
+    Share 3 natural thoughts about what you need to do next. For example:
+    "First, I'll gather all the relevant information"
+    "Then I need to analyze the key points"
+    "Finally, I'll organize everything into a clear structure"
+    
+    Keep responses casual and natural. Just share the thoughts without any prefixes or formatting.
+    """     
+    thinking_steps = llm.invoke(step_prompt).content.split(",")
+
+    #print(f"raw response----- {thinking_steps}")
+
+    # Clean up and filter empty lines
+    thinking_steps = [
+        t.strip().strip('"').strip("'")
+        for t in thinking_steps 
+        if t.strip() and not t.startswith(("-", "*", "•", "1.", "2.", "3."))
+    ]
+
+    #print(f"cleaned response----- {thinking_steps}")
+
+    # Join into a single string with newline separators
+    detail_text = "\n".join(thinking_steps)
+
+    thinking_data = {
+        "step": step, 
+        "detail": detail_text
+    }
 
     if "thinking_steps" not in state:
         state["thinking_steps"] = []
@@ -38,7 +68,7 @@ def kb_retrieval_node(state: State, streaming_callback) -> State:
 
     query = f"Retrieve all information about {topic}. The problem is: {problem}. The proposed solution is: {solution}."
     logging.info(f"KB Query: {query}")
-    kb_content = kb_qdrant_tool._run(question=query, top_k=10)
+    kb_content = kb_qdrant_tool.run(question=query, top_k=10)
     stream_thinking_step(state, "kb_retrieval", "Parsing and extracting key info from KB content...", streaming_callback)
 
     prompt = f"Extract key info from the following knowledge base content on '{topic}', problem statement '{problem}' and solution '{solution}':\n{kb_content}"
@@ -57,8 +87,8 @@ def web_scrape_node(state: State, streaming_callback) -> State:
     scrape_results = {}
     for link in web_scraping_links:
         try:
-            scraper = ScrapeWebsiteTool(website_url=link)
-            result = remove_links(scraper.run())
+            scraper = ScrapeWebsiteTool()
+            result = remove_links(scraper.run(website_url=link))
             scrape_results[link] = result
         except Exception:
             scrape_results[link] = "Error occurred during scraping"
@@ -96,11 +126,36 @@ def generate_content_node(state: State, streaming_callback) -> State:
     kb_content = state.get("kb_content", "")
     web_scrape_content = state.get("web_scrape_content", "")
     reference_doc_content = state.get("extracted_reference_doc_content", "")
-    query=llm.invoke(f"""Generate a query to find the top competitors for the topic {topic} solving the problem of {problem} with solution {solution}. 
-                        Give only the query as output without any extra text. eg. top document moderation system financial document handling moderation images text safe compliance parser""")
+    query=llm.invoke(f"""Provided you with the topic {topic}, problem statement {problem} and a solution {solution}.
+                        Your task is to generate a single, concise, and keyword-rich search query that can be used by a web search tool to discover similar or competing products or services in the market.
+                        The query must:
+                        - Understand the topic, problem, and solution.
+                        - Reflect the real functionality described in the solution.
+                        - Use practical, discoverable keywords people would actually search.
+                        - Form a focused, real-world query like one a user would type into Google to find competitors or alternatives.
+                        - Be specific enough to surface tools or services addressing the same use case.
+                        Return only the search query string. Do not include explanations, extra formatting, or labels.
+                     
+                        ### Just an example, the input can vary:
+
+                        **Input:**
+                        Topic: Doculocker  
+                        Problem Statement: To implement a document moderation system to ensure uploaded documents are free from adult, illegal, or inappropriate content. The system will analyze both images and embedded text to maintain compliance and uphold a safe, trustworthy platform for financial document handling.  
+                        Solution: Develop a solution that automatically verifies whether an uploaded document — Word (doc/docx) and Excel (csv/xlsx) — is free from unsafe content, including but not limited to adult, illegal, violent, hateful, discriminatory, or offensive material. The system will analyze both images and embedded text to accurately classify documents as safe or flag them for further review, ensuring compliance and maintaining a standard of trust and safety on the platform.
+
+                        **EXPECTED QUERY OUTPUT:**
+                        Products/Services for detecting adult or violent content from images in Word and Excel documents using text and image moderation
+
+                        **Why this query works:**
+                        It leads to relevant services like:
+                        - **Amazon Rekognition**
+                        - **Google Cloud Vision API**
+                        - **Microsoft Azure Content Moderator**
+                        """)
     
+    print(f"query for competitor-----------------{query.content}")
     web_tool = WebTrustedSearchTool()
-    competitor_results = web_tool._run(query=query.content, trust=False,read_content=False, top_k=20, onef_search=False)
+    competitor_results = web_tool.run(query=query.content, trust=False,read_content=False, top_k=20, onef_search=False)
 
     prompt = CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_doc_content, web_scrape_content, kb_content, competitor_results)
     result = llm.invoke(prompt)
@@ -140,23 +195,52 @@ def answer_faq_node(state: State, streaming_callback) -> State:
     all_questions = internal_q + external_q
 
     results = []
-    tool = ContextFusionTool()
+    web_tool = WebTrustedSearchTool()
+    kb_tool = kb_qdrant_tool
 
-    with ThreadPoolExecutor(max_workers=os.getenv('THREAD_POOL_WORKERS', 12)) as executor:
-        futures = [executor.submit(tool._run, q+ f"in the context of {topic}", state.get("use_websearch", False)) for q in all_questions]
-        for future in futures:
-            results.append(future.result())
-            logging.info(f"Processed question: {future.result()}")
+    max_workers = int(os.getenv('THREAD_POOL_WORKERS', 12))
 
-    response= "\n\n".join(results)
-    print(f"\n\nGenerated FAQ Answer Context: {response}")
+    def process_question(question, topic, use_websearch):
+        full_question = question + f" in the context of {topic}"
+        kb_result = kb_tool.run(full_question)
+        web_result = None
+        if use_websearch:
+            web_result = web_tool.run(
+                query=full_question,
+                trust=True,
+                read_content=False,
+                top_k=5,
+                onef_search=False
+            )
+        return {
+            "question": question,
+            "kb_result": kb_result,
+            "web_result": web_result
+        }
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_question = {
+            executor.submit(process_question, q, topic, state.get("use_websearch", False)): q
+            for q in all_questions
+        }
+        for future in as_completed(future_to_question):
+            result = future.result()
+            results.append(result)
+            # logging.info(f"Processed question: {result['question']}")
+            # logging.info(f"Knowledge Base Results: {result['kb_result']}")
+            # logging.info(f"Web Search Results: {result['web_result']}")
+            print(f"\n\nProcessed Question: {result['question']}")
+            print(f"-----------Knowledge Base Results:-----------\n {result['kb_result']}")
+            print(f"-----------Web Search Results:-----------\n {result['web_result']}")
     
-    prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, web_scrape_content, reference_doc_content)
+    logs= results
+    
+    prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, results, web_scrape_content, reference_doc_content)
     response = llm.invoke(prompt)
     response = convert_to_json(response.content)
     stream_thinking_step(state, "answer_faqs", "PRFAQ generated!", streaming_callback)
     
-    return {
+    prfaq= {
         **state,
         "Title": generated_content.get("Title", ""),
         "Subtitle": generated_content.get("Subtitle", ""),
@@ -168,6 +252,7 @@ def answer_faq_node(state: State, streaming_callback) -> State:
         "ExternalFAQs": response.get("ExternalFAQs", ""),
         "UserResponse": response.get("UserResponse", "Here is the generated PR/FAQ document on topic and your provided inputs. Please review and let me know if any changes are needed")
     }
+    return prfaq
 
 # --- LangGraph Workflow ---
 def start_langgraph(inputs, streaming_callback):
