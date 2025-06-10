@@ -3,16 +3,17 @@ from pydantic import BaseModel
 from typing import Optional, List
 from langchain_openai import ChatOpenAI  
 from concurrent.futures import ThreadPoolExecutor
-from tools.context_fusion_tool import ContextFusionTool
 from postgrest import APIError
 from fastapi.responses import StreamingResponse
+from tools.web_search.web_search import WebTrustedSearchTool
+from tools.qdrant_tool import kb_qdrant_tool
 import asyncio
 import os
 import json
 from dotenv import load_dotenv
 load_dotenv()
 
-from servers.mainapp import authenticate
+from api.authenticate import authenticate
 
 from graph import start_langgraph
 
@@ -315,8 +316,16 @@ async def modify_faq(
         refined_query_response = llm.invoke(refine_prompt)
         refined_query = refined_query_response.content.strip()
 
-        tool = ContextFusionTool()
-        context_response=tool.run(question=refined_query, use_websearch=x_web_search.lower() == 'true')
+        kb_response = kb_qdrant_tool.run(refined_query)
+
+        web_tool = WebTrustedSearchTool()
+        web_response = web_tool.run(
+            query=refined_query,
+            trust=True,
+            read_content=False,
+            top_k=5,
+            onef_search=False
+        )
 
         # Modify the FAQ using the refined query and search results
         prompt = f"""
@@ -332,8 +341,11 @@ async def modify_faq(
             A search was carried out for the feedback with the refined query:
             "{refined_query}"
 
-            The web search and knowledge base returned the following results. Use this information to enhance the FAQ wherever relevant:
-            "{context_response}"
+            The response from knowledge base search is as follows:
+            {kb_response}
+
+            The response from web search is as follows:
+            {web_response}
 
             Chat history for context:
             ```{messages}```

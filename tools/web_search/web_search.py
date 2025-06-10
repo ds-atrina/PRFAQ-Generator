@@ -1,14 +1,7 @@
-from bs4 import BeautifulSoup
-from tools.base_tool.base_tool import BaseTool
-from pydantic import BaseModel, Field
-from typing import Type, List, Dict, Any
+from typing import List, Dict, Any
 import requests
-import datetime
-import re
 import os
-import time
 from langchain_openai import ChatOpenAI
-from urllib.parse import urlparse
 from tools.web_search.whitelisted_sites import whitelisted_domain_list, onefinance_whitelisted_sites
 from dotenv import load_dotenv
 
@@ -16,19 +9,9 @@ load_dotenv()
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
 
-class WebSearchQuerySchema(BaseModel):
-    query: str = Field(..., description="Search query to find relevant information.")
-    trust: bool = Field(True, description="Whether to search on trusted sites more.")
-    read_content: bool = Field(False, description="Whether to read top sites' article content or not.")
-    top_k: int = Field(20, description="Number of top results to fetch from the search engine.")
-    onef_search: bool = Field(False, description="Whether to search on OneF sites only or not. If true, it will search on 1F and return the results.")
-
-class WebTrustedSearchTool(BaseTool):
-    name: str = "Web Trusted Search Tool"
-    description: str = (
-        "Performs smart search on relevant whitelisted financial sites using Web Search"
-    )
-    args_schema: Type[BaseModel] = WebSearchQuerySchema
+class WebTrustedSearchTool:
+    def __init__(self, api_url=None):
+        self.api_url = api_url or os.getenv("WEB_TRUSTED_SEARCH_API_URL", "http://localhost:3000/api/v1/tools/web-search")
 
     def _choose_relevant_domains(self, query: str) -> List[str]:
         prompt = (
@@ -137,24 +120,22 @@ class WebTrustedSearchTool(BaseTool):
             - Consumer Price Index (USA)
             """
             f"Pick the top 3 most likely to contain helpful info for this context. "
-            f"Return ONLY the domain names."
+            f"Return ONLY the domain names in a list like ['domain1.com', 'domain2.com', 'domain3.com']."
         )
         response = llm.invoke(prompt)
         selected = []
         for domain in whitelisted_domain_list:
             if domain.lower() in response.content.lower():
                 selected.append(domain)
-
         return selected
-    
-    def _choose_onef_domains(self, query: str) -> List[str]:
+
+    def choose_onef_domains(self, query: str) -> List[str]:
         prompt = (
             f"You are helping a researcher identify the most relevant company websites to search.\n"
             f"Query: {query}\n"
             f"Here is a list of approved domains:\n{chr(10).join(onefinance_whitelisted_sites)} and their information:\n\n"
             """Below is a list of trusted, whitelisted sources and the types of data they provide:
-            ---"",
-
+            ---
             # Research & education platform for all macro indicators of India (indiamacroindicators.co.in)
             # Research and education platform for all cryptos with crypto scoring & ranking (indiacryptoresearch.co.in)
             # AI driven tax education and advisory (planmytax.ai)
@@ -165,209 +146,65 @@ class WebTrustedSearchTool(BaseTool):
             # Community to bring together HR's who care about employee wellness - mental and financial (indiahrconclave.com)
             """
             f"Pick the top 2 most likely to contain helpful info for this context. "
-            f"Return ONLY the domain names."
+            f"Return ONLY the domain names in a list like ['domain1.com', 'domain2.com']."
         )
         response = llm.invoke(prompt)
         selected = []
         for domain in onefinance_whitelisted_sites:
             if domain.lower() in response.content.lower():
                 selected.append(domain)
-
         return selected
 
+    def call_web_search_api(self, query: str, read_content: bool, top_k: int, selected_domains: list) -> dict:
+        payload = {
+            "query": query,
+            "read_content": read_content,
+            "top_k": top_k,
+            "selectedDomains": selected_domains
+        }
+        headers = {"Content-Type": "application/json"}
+        # print(f"Calling web search API with payload: {payload}")
+        resp = requests.post(self.api_url, headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
 
-    def calculate_relevance_score(self, result: Dict[str, Any], query: str) -> int:
-        try:
-            lowercase_content = result['content'].lower()
-            lowercase_query = query.lower()
-            query_words = [
-                re.escape(word)
-                for word in lowercase_query.split()
-                if len(word) > 2
-            ]
+    def run(
+        self,
+        query: str,
+        trust: bool = True,
+        read_content: bool = False,
+        top_k: int = 20,
+        onef_search: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Uses LLM to select relevant domains, then calls the external web search API
+        (which expects selectedDomains as a parameter).
+        """
+        selected_domains = [""]
 
-            score = 0
-            if lowercase_query in lowercase_content:
-                score += 30
-            for word in query_words:
-                word_count = lowercase_content.count(word)
-                score += word_count * 3
-
-            lowercase_title = result['title'].lower()
-            if lowercase_query in lowercase_title:
-                score += 20
-            for word in query_words:
-                if word in lowercase_title:
-                    score += 10
-
-            if "publishedDate" in result:
-                publish_date = datetime.datetime.strptime(result['publishedDate'], '%Y-%m-%d')
-                days_since = (datetime.datetime.now() - publish_date).days
-                if days_since < 30:
-                    score += 15
-                elif days_since < 90:
-                    score += 10
-                elif days_since < 365:
-                    score += 5
-
-            if len(result['content']) < 200:
-                score -= 10
-            elif len(result['content']) > 1000:
-                score += 5
-
-            highlight_count = result['content'].count("<mark>")
-            score += highlight_count * 2
-
-            if "url" in result:
-                parsed_url = urlparse(result["url"])
-                domain = parsed_url.netloc.lower()
-                for whitelisted_domain in whitelisted_domain_list:
-                    if whitelisted_domain in domain:
-                        score += 30
-                        break
-                for whitelisted_domain in onefinance_whitelisted_sites:
-                    if whitelisted_domain in domain:
-                        score += 25
-                        break
-
-            return score
-        except Exception:
-            return 0
-
-    def _parse_html_response(self, html: str) -> List[Dict[str, str]]:
-        soup = BeautifulSoup(html, "html.parser")
-        results = []
-        for item in soup.find_all("div", class_="result"):
-            title = item.find("h4")
-            url = item.find("a", href=True)
-            content = item.find("p")
-            if title and url and content:
-                results.append({
-                    "title": title.text.strip(),
-                    "url": url['href'],
-                    "content": content.text.strip(),
-                })
-        return results
-
-    def _run(self, query: str, trust:bool, read_content:bool, top_k:int, onef_search: bool) -> Dict[str, Any]:
-        """Search Brave Search with a freeform query and fetch content from top 5 sites."""
-        # print("Running web search tool with query:", query)
-        brave_instance = "https://api.search.brave.com"
-        selected_domains=[""]
-        
         if trust:
             selected_domains.extend(self._choose_relevant_domains(query))
             selected_domains.remove("")
 
         if onef_search:
-            selected_domains.extend(self._choose_onef_domains(query))
+            selected_domains.extend(self.choose_onef_domains(query))
             selected_domains.append("1finance.co.in")
             if "" in selected_domains:
                 selected_domains.remove("")
+        
+        if not selected_domains:
+            selected_domains.append("")
 
-        results = []
-        for domain in selected_domains:
-            search_query = f"site:{domain} {query}" if domain else query
-            payload = {
-                "q": search_query,
-                "format": "json",
-                "country": "IN",
-                "summary": True
-            }
-
-            retries = 3  # Maximum number of retries
-            backoff = 1  # Initial backoff time in seconds
-
-            while retries > 0:
-                try:
-                    # Brave Search API URL
-                    url = f"{brave_instance}/res/v1/web/search"
-                    headers = {
-                        "X-Subscription-Token": os.environ["BRAVE_API_KEY"],
-                        "Accept": "application/json",
-                    }
-                    resp = requests.get(url, headers=headers, params=payload, timeout=10)
-                    resp.raise_for_status()
-                    # print(resp.text)
-                    if resp.headers.get("Content-Type", "").startswith("application/json"):
-                        data = resp.json()
-                        for result in data.get("web", {}).get("results", []):  # Correctly navigate to 'web' -> 'results'
-                            results.append({
-                                "title": result.get("title"),
-                                "url": result.get("url"),
-                                "content": result.get("description", ""),  # Use 'description' instead of 'content'
-                                "search_query": search_query
-                            })
-                    else:
-                        self._parse_html_response(resp.text)
-                    break  # Exit the retry loop on success
-
-                except requests.exceptions.HTTPError as e:
-                    if resp.status_code == 429:  # Too Many Requests
-                        # print(f"Rate limited. Retrying in {backoff} seconds...")
-                        time.sleep(backoff)  # Wait before retrying
-                        backoff *= 2  # Exponential backoff
-                        retries -= 1
-                    else:
-                        # results.append({
-                        #     "error": f"Error retrieving from {domain}",
-                        #     "details": str(e),
-                        #     "search_query": search_query
-                        # })
-                        break
-                except requests.exceptions.RequestException as e:
-                    # results.append({
-                    #     "error": f"Error retrieving from {domain}",
-                    #     "details": str(e),
-                    #     "search_query": search_query
-                    # })
-                    break
-
-        if len(results) > top_k:
-            filtered = [r for r in results if 'content' in r]
-            scored = [
-                {
-                    **r,
-                    "score": self.calculate_relevance_score(r, r.get("search_query", ""))
-                } for r in filtered
-            ]
-            
-        else:
-            filtered = [r for r in results if 'content' in r]
-            scored = [
-                {
-                    **r,
-                    "score": self.calculate_relevance_score(r, r.get("search_query", ""))
-                } for r in filtered
-            ]
-        scored_results = sorted(scored, key=lambda x: x['score'], reverse=True)[:top_k]
-
-        if read_content:
-            # Fetch article content for top 5 results
-            processed_count = 0
-            for result in scored_results:
-                if processed_count >= 5:
-                    break
-
-                url = result.get("url")
-                if url:
-                    try:
-                        response = requests.get(url, timeout=10)
-                        response.raise_for_status()
-                        soup = BeautifulSoup(response.text, 'html.parser')
-
-                        # Extract content from <article> tags
-                        article_content = ""
-                        for article in soup.find_all("article"):
-                            article_content += article.get_text(separator="\n").strip() + "\n"
-
-                        # Append article content if available
-                        if article_content.strip():
-                            result["article_content"] = article_content.strip()[:10000]
-                            processed_count += 1  # Increment the count of successfully processed results
-
-                    except requests.exceptions.RequestException as e:
-                        # result["article_content"] = f"Error retrieving article content: {str(e)}"
-                        pass
-
-        return {"search_results": scored_results}
+        results = self.call_web_search_api(
+            query=query,
+            read_content=read_content,
+            top_k=top_k,
+            selected_domains=selected_domains
+        )
+        return results
+    
+if __name__ == "__main__":
+    query = "latest RBI repo rate"
+    tool = WebTrustedSearchTool()
+    results = tool.run(query, read_content=True, top_k=5, trust=True, onef_search=True)
+    print(results)
