@@ -146,7 +146,7 @@ async def generate_prfaq(
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id", description="Thread ID for tracking the request"),
     x_command: Optional[str] = Header(None, alias="x-command", description="Command in use"),
     x_web_search: Optional[str] = Header("False", alias="x-web-search", description="Boolean flag to use web search"),
-    user: str = Depends(authenticate)
+    # user: str = Depends(authenticate)
 ):
     """
     Generate a PR FAQ for a given spaceid by fetching data from the Supabase database.
@@ -209,7 +209,7 @@ async def generate_prfaq_logs(
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id"),
     x_command: Optional[str] = Header(None, alias="x-command"),
     x_web_search: Optional[str] = Header("False", alias="x-web-search"),
-    user: str = Depends(authenticate),
+    # user: str = Depends(authenticate),
 ):
     """
     SSE Streaming endpoint for PRFAQ generation.
@@ -274,7 +274,7 @@ async def modify_faq(
     x_thread_id: Optional[str] = Header(None, alias="x-thread-id", description="Thread ID for tracking the request"),
     x_command: Optional[str] = Header(None, alias="x-command", description="Command in use"),
     x_web_search: Optional[str] = Header("False", alias="x-web-search", description="Boolean flag to use web search"),
-    user: str = Depends(authenticate),
+    # user: str = Depends(authenticate),
 ):
     """
     Modify an existing PR FAQ based on user feedback and additional context.
