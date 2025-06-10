@@ -317,15 +317,16 @@ async def modify_faq(
         refined_query = refined_query_response.content.strip()
 
         kb_response = kb_qdrant_tool.run(refined_query)
-
-        web_tool = WebTrustedSearchTool()
-        web_response = web_tool.run(
-            query=refined_query,
-            trust=True,
-            read_content=False,
-            top_k=5,
-            onef_search=False
-        )
+        web_response = ""
+        if x_web_search:
+            web_tool = WebTrustedSearchTool()
+            web_response = web_tool.run(
+                query=refined_query,
+                trust=True,
+                read_content=False,
+                top_k=5,
+                onef_search=False
+            )
 
         # Modify the FAQ using the refined query and search results
         prompt = f"""
