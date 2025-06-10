@@ -11,7 +11,7 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI
 
 class WebTrustedSearchTool:
     def __init__(self, api_url=None):
-        self.api_url = api_url or os.getenv("WEB_TRUSTED_SEARCH_API_URL", "http://localhost:3000/api/v1/tools/web-search")
+        self.api_url = api_url or os.getenv("WEB_TRUSTED_SEARCH_API_URL", "https://dev-aion.onefin.app/api/v1/tools/web-search")
 
     def _choose_relevant_domains(self, query: str) -> List[str]:
         prompt = (

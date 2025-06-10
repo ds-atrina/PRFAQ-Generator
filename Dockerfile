@@ -12,4 +12,4 @@ COPY . /app
 
 EXPOSE 8082
 
-ENTRYPOINT ["python", "api.py"]
+ENTRYPOINT ["python", "servers/mainapp.py"]

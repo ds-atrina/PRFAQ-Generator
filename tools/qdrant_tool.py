@@ -4,7 +4,7 @@ from tools.web_search.web_search import WebTrustedSearchTool
 
 class QdrantTool:
     def __init__(self, api_url=None):
-        self.api_url = api_url or os.getenv("QDRANT_TOOL_API_URL") or "http://localhost:3000/api/v1/tools/qdrant"
+        self.api_url = api_url or os.getenv("QDRANT_TOOL_API_URL") or "https://dev-aion.onefin.app/api/v1/tools/qdrant"
 
     def run(self, question: str, top_k: int = 5) -> dict:
         

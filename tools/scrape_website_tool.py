@@ -6,7 +6,7 @@ import requests
 class ScrapeWebsiteTool:
 
     def __init__(self, api_url=None,):
-        self.api_url = api_url or os.getenv("WEB_SCRAPE_TOOL_API_URL") or "http://localhost:3000/api/v1/tools/web-scrape"
+        self.api_url = api_url or os.getenv("WEB_SCRAPE_TOOL_API_URL") or "https://dev-aion.onefin.app/api/v1/tools/web-scrape"
 
     def run(self, website_url: str) -> Any:
 
