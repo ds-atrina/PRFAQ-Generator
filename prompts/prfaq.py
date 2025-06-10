@@ -42,7 +42,7 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
 
         ---
 
-        ### 🎯 Objective:
+        ### Objective:
         Create ~9-10 well-structured questions each for:
         - **Internal FAQs** (for product, engineering, legal, etc.)
         - **External FAQs** (for customers, partners, press)
@@ -51,14 +51,14 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
 
         ---
 
-        ### 🧠 Step 1: Generate & Combine
+        ### Step 1: Generate & Combine
         1. Generate 20 exhaustive questions per section.
         2. Combine/rephrase overlapping or similar questions (except fixed ones).
         3. Final output: ~9-10 concise, high-value questions per section.
 
         ---
 
-        ### 🛑 Mandatory Questions (Rephrasing allowed, but do not remove, combine, or relocate):
+        ### Mandatory Questions (Rephrasing allowed, but do not remove, combine, or relocate):
 
         #### Internal (must STRICTLY appear in **Internal FAQs only**):
         - Who is the target audience for this product who were facing the problem statement?
@@ -73,7 +73,7 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
 
         ---
 
-        ### 🧾 Structure Guidance
+        ### Structure Guidance
 
         #### Internal FAQs: 
         Cover areas like:
@@ -96,14 +96,14 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
 
         ---
 
-        ### ✅ Inputs for Question Generation (in priority order):
+        ### Inputs for Question Generation (in priority order):
         1. Problem & solution from `content_generation_agent` and chat history
         2. Output of `kb_agent`
         3. Output of `web_scrape_extractor` and `extract_info_agent`
 
         ---
 
-        ### ⚠️ Important Constraints:
+        ### Important Constraints:
         - Do **not** introduce fabricated or assumed information
         - Avoid any duplication, overlap, or semantically similar questions
         - Keep tone aligned with 1 Finance brand:
@@ -114,7 +114,7 @@ def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
 
         ---
 
-        ### ✅ Output Format (JSON):
+        ### Output Format (JSON):
         ```json
         {{
         "internal_questions": [
