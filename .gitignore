@@ -2,6 +2,7 @@
 prfaqvenv/
 vector_store/
 __pycache__/
-stvenv/
+venv/
 db/
-test/
+temp/
+ftenv/
