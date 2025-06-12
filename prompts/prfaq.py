@@ -33,99 +33,124 @@ def CONTENT_GENERATION_PROMPT(topic, problem, solution, chat_history, reference_
 
 def QUESTION_GENERATION_PROMPT(topic, problem, solution, chat_history):
     return f"""{role_info}
-        You are tasked with generating clear, structured, and **non-redundant Internal and External FAQs** for a PRFAQ document using the inputs below:
 
-        - **Topic**: {topic}
-        - **Problem**: {problem}
-        - **Solution**: {solution}
-        - **Chat History (including PRFAQ introduction)**: {chat_history}
+    You are tasked with generating clear, structured, and **non-redundant Internal and External FAQs** for a PRFAQ document using the inputs below.
+    ---
 
-        ---
+    ### Inputs
+    - **Topic**: {topic}
+    - **Problem**: {problem}
+    - **Solution**: {solution}
+    - **Chat History**: {chat_history}
 
-        ### Objective:
-        Create ~9-10 well-structured questions each for:
-        - **Internal FAQs** (for product, engineering, legal, etc.)
-        - **External FAQs** (for customers, partners, press)
+    ---
 
-        Each section should follow a logical PRFAQ-style narrative — avoid random ordering.
+    ### Step-by-Step Generation Process (MUST FOLLOW STRICTLY)
 
-        ---
+    ####  STEP 1: Draft Raw Questions  
+    Generate **20 raw questions each** for:
 
-        ### Step 1: Generate & Combine
-        1. Generate 20 exhaustive questions per section.
-        2. Combine/rephrase overlapping or similar questions (except fixed ones).
-        3. Final output: ~9-10 concise, high-value questions per section.
+    - **Internal FAQs**, focusing on:
+    - Business rationale and market need  
+    - Product vision and company alignment  
+    - Urgency and timing  
+    - Technical approach, scalability, and risks  
+    - Legal, compliance, and privacy considerations  
+    - Resources, timelines, launch readiness  
+    - Success metrics and roadmap  
 
-        ---
+    - **External FAQs**, focusing on:
+    - What the product is and the core problem it solves  
+    - Target users and usage  
+    - Pricing, onboarding, and availability  
+    - Features and limitations  
+    - Data handling, privacy, and security  
+    - Support and updates roadmap  
 
-        ### Mandatory Questions (Rephrasing allowed, but do not remove, combine, or relocate):
+    ---
 
-        #### Internal (must STRICTLY appear in **Internal FAQs only**):
-        - Who is the target audience for this product who were facing the problem statement?
-        - What is the potential impact on business/Return on Investment (ROI) for the company?
-        - Which departments were involved, are currently involved, or will need to be involved in executing this, and what will their roles be?
-        - Does it align with the company's philosophy?
+    ####  STEP 2: Deduplicate & Prioritize  
+    - Review all 20 raw questions in each section.  
+    - **Merge or rephrase** any overlapping or semantically similar questions.  
+    - Select the **8–9 most important, distinct, and high-value questions per section** to retain.
 
-        #### External (must STRICTLY appear in **External FAQs only**):
-        - How will it impact/make the target audience's life better?
+    ---
 
-        These questions **must be slightly reframed for clarity** and appear **in random order within their correct section only**.
+    ####  STEP 3: Add Mandatory Questions (STRICTLY ENFORCED)
 
-        ---
+    > Do not skip this step. Do not misplace. Do not duplicate. Mandatory questions are **non-negotiable**.
 
-        ### Structure Guidance
+    After Step 2 is complete:
+    - Insert the following **mandatory questions** into their **designated sections only**.
+    - These must be inserted **in random order** (not grouped at the bottom) **within** the 8–9 curated questions.
+    - These questions must appear **exactly once**, **only in their correct section**, and **must not be altered in meaning** (light rephrasing is allowed for clarity or tone).
 
-        #### Internal FAQs: 
-        Cover areas like:
-        - Business rationale and market need
-        - Product vision and alignment with company 
-        - Why is this a problem that needs to be solved right now
-        - Technical approach, risks, and scalability
-        - Legal, compliance, and privacy concerns
-        - Resourcing, timeline, and launch readiness
-        - Success metrics and future roadmap
+    ---
 
-        #### External FAQs:
-        Cover:
-        - How it the product is to be used and how it helps the target audience
-        - What the product is and what problems it solves
-        - Pricing, availability, onboarding
-        - Key features and known limitations
-        - Security, privacy, and data handling
-        - Support and future updates
+    **Internal FAQs — Add ALL 4 questions ONLY to Internal section:**
+    1. Who is the target audience for this product?  
+    2. What is the potential impact on business/Return on Investment (ROI) for the company?  
+    3. Which departments are or will be involved in the execution of this initiative, and what roles will they play?
+    4. Does it align with the company's philosophy?
 
-        ---
+    > DO NOT place these in the External FAQs  
+    > MUST appear **only once**, **randomly interspersed** in the Internal section
+    > Final Internal FAQ count: **12–13** (8–9 generated + 4 mandatory)
 
-        ### Inputs for Question Generation (in priority order):
-        1. Problem & solution from `content_generation_agent` and chat history
-        2. Output of `kb_agent`
-        3. Output of `web_scrape_extractor` and `extract_info_agent`
+    ---
 
-        ---
+    ** External FAQs — Add ONLY this 1 question to External section:**
+    1. How will it impact/make the target audience's life better?
 
-        ### Important Constraints:
-        - Do **not** introduce fabricated or assumed information
-        - Avoid any duplication, overlap, or semantically similar questions
-        - Keep tone aligned with 1 Finance brand:
-        {onefinance_guidelines}
+    > DO NOT place this in Internal FAQs  
+    > MUST appear **only once**, **randomly interspersed** in the External section
+    > Final External FAQ count: **9–10** (8–9 generated + 1 mandatory)
 
-        You are acting on behalf of **1 Finance**:  
-        {onefinance_info}
+    ---
 
-        ---
+    ### Input References (in priority order):
+    1. Problem & solution from `content_generation_agent` and `chat_history`  
+    2. Output of `kb_agent`  
+    3. Output of `web_scrape_extractor` and `extract_info_agent`  
 
-        ### Output Format (JSON):
-        ```json
-        {{
-        "internal_questions": [
-            "Rephrased internal Q1...",
-            ...
-        ],
-        "external_questions": [
-            "Rephrased external Q1...",
-            ...
-        ]
-        }}
+    ---
+
+   ### Hard Constraints
+    -  Do not fabricate or assume facts not in the input  
+    -  Do not duplicate or move mandatory questions  
+    - Internal FAQs must contain **exactly 4 mandatory questions + 8–9 non-mandatory**  
+    - External FAQs must contain **exactly 1 mandatory question + 8–9 non-mandatory**  
+    - Mandatory questions must appear **only in their correct section** and **in random positions**  
+    - Ensure Internal FAQs total to **12–13**, and External FAQs total to **9–10**
+
+    ---
+
+    ### Tone and Brand
+    - Maintain tone and voice consistent with **1 Finance**:  
+    {onefinance_guidelines}
+    - Adhere to standards of positioning and accuracy:  
+    {onefinance_info}
+
+    ---
+    ### Final Output Format 
+    Return the output in JSON format like this:
+
+    ```json
+    {{
+    "internal_questions": [
+        "What are the key risks we’ve identified in deployment?",
+        "How does this product align with our quarterly OKRs?",
+        "Who is the target audience for this product?",
+        "What is the potential impact on business/Return on Investment (ROI) for the company?",
+        "Which departments are or will be involved in the execution of this initiative, and what roles will they play?"
+        "Does it align with the company's philosophy?"
+    ],
+    "external_questions": [
+        "What is the onboarding process for a new user?",
+        "How does this solution differ from others in the market?",
+        "How will it impact/make the target audience's life better?"
+    ]
+    }}
     """
 
 def ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, response, web_scrape_content, reference_doc_content):

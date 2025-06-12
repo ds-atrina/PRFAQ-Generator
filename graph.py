@@ -183,6 +183,7 @@ def answer_faq_node(state: State, streaming_callback) -> State:
     stream_thinking_step(state, "answer_faqs", "Answering all generated FAQs using all available information...", streaming_callback)
     llm = get_openai_llm()
     questions = state.get("faq_questions", {})
+    #print(f"---------------question list:{questions}")    
     generated_content = state.get("generated_content", {})
     topic = state.get("topic")
     problem = state.get("problem")
@@ -192,9 +193,7 @@ def answer_faq_node(state: State, streaming_callback) -> State:
     web_scrape_content = state.get("web_scrape_content", "")
     reference_doc_content = state.get("extracted_reference_doc_content", "")
     chat_history = state.get("chat_history", ["Generate this PR/FAQ for me"])
-    all_questions = internal_q + external_q
-
-    results = []
+    
     web_tool = WebTrustedSearchTool()
     kb_tool = kb_qdrant_tool
 
@@ -217,30 +216,41 @@ def answer_faq_node(state: State, streaming_callback) -> State:
             "kb_result": kb_result,
             "web_result": web_result
         }
-
+    
+    # Process internal_questions preserving order
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_question = {
-            executor.submit(process_question, q, topic, state.get("use_websearch", False)): q
-            for q in all_questions
-        }
-        for future in as_completed(future_to_question):
-            result = future.result()
-            results.append(result)
-            # logging.info(f"Processed question: {result['question']}")
-            # logging.info(f"Knowledge Base Results: {result['kb_result']}")
-            # logging.info(f"Web Search Results: {result['web_result']}")
-            print(f"\n\nProcessed Question: {result['question']}")
-            print(f"-----------Knowledge Base Results:-----------\n {result['kb_result']}")
-            print(f"-----------Web Search Results:-----------\n {result['web_result']}")
-    
-    logs= results
-    
-    prompt = ANSWER_GENERATION_PROMPT(topic, problem, solution, chat_history, results, web_scrape_content, reference_doc_content)
+        internal_futures = [
+            executor.submit(process_question, q, topic, state.get("use_websearch", False))
+            for q in internal_q
+        ]
+        internal_results = [future.result() for future in internal_futures]
+        
+    # Process external_questions preserving order
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        external_futures = [
+            executor.submit(process_question, q, topic, state.get("use_websearch", False))
+            for q in external_q
+        ]
+        external_results = [future.result() for future in external_futures]
+
+    # Debug printing for processed questions
+    for result in internal_results + external_results:
+        print(f"\n\nProcessed Question: {result['question']}")
+        print(f"-----------Knowledge Base Results:-----------\n {result['kb_result']}")
+        print(f"-----------Web Search Results:-----------\n {result['web_result']}")
+
+    # Pass the processed FAQs separated into internal and external sections to the prompt
+    prompt = ANSWER_GENERATION_PROMPT(
+        topic, problem, solution, chat_history,
+        {"internal_questions": internal_results, "external_questions": external_results},
+        web_scrape_content, reference_doc_content
+    )
+
     response = llm.invoke(prompt)
     response = convert_to_json(response.content)
     stream_thinking_step(state, "answer_faqs", "PRFAQ generated!", streaming_callback)
     
-    prfaq= {
+    prfaq = {
         **state,
         "Title": generated_content.get("Title", ""),
         "Subtitle": generated_content.get("Subtitle", ""),
