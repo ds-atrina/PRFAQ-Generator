@@ -5,8 +5,8 @@ langchain-openai==0.2.6
 langchain-community
 python-docx
 qdrant-client
-pysqlite3-binary
-setuptools
+# pysqlite3-binary
+# setuptools
 supabase
 postgrest
 langgraph

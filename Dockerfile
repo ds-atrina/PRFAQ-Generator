@@ -10,6 +10,8 @@ RUN pip install -r requirements.txt
 
 COPY . /app
 
+ENV PYTHONPATH=/app
+
 EXPOSE 8082
 
 ENTRYPOINT ["python", "servers/mainapp.py"]
