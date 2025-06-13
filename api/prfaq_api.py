@@ -309,8 +309,6 @@ async def modify_faq(
         - If the query involves costing or pricing, explicitly add "India" and "cost breakdown" or "pricing table" in the search query.
         - Return ONLY the refined search query as a string without any additional text.      
         """
-        refined_query_response = llm.invoke(refine_prompt)
-        refined_query = refined_query_response.content.strip()
 
         # Perform Web Search and Knowledge Base Search
         refined_query_response = llm.invoke(refine_prompt)
@@ -318,7 +316,7 @@ async def modify_faq(
 
         kb_response = kb_qdrant_tool.run(refined_query)
         web_response = ""
-        if x_web_search:
+        if x_web_search.lower() == 'true':
             web_tool = WebTrustedSearchTool()
             web_response = web_tool.run(
                 query=refined_query,
