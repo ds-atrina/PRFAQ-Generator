@@ -141,7 +141,7 @@ def modify_faq(existing_faq, user_feedback, topic, problem, solution, chat_histo
     Modify an existing PR FAQ based on user feedback, chat history, and additional context. 
     This function uses refined search queries to gather relevant information from web and knowledge base searches.
     """
-    llm = ChatOpenAI(model="o4-mini", temperature=1)  # Initialize LLM
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",temperature=0.2)
 
     refine_prompt = f"""
         The user provided the following feedback:

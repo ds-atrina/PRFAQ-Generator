@@ -47,11 +47,26 @@ def render_text_or_table_to_str(text_or_data):
             return '\n'.join(f"- {item}" for item in text_or_data)
     return text_or_data
 
-def convert_to_json(response):
-    response_text = response.replace("```json","").replace("```","").strip()
+def convert_to_json(response: str):
+    """
+    Extract and parse the first JSON object from the response string.
+    If parsing fails, return the error and the raw string for debugging.
+    """
+    response_text = response.strip()
+
+    # Remove markdown/code fences
+    response_text = re.sub(r"^```(?:json)?|```$", "", response_text, flags=re.MULTILINE).strip()
+
+    # Try to extract the first JSON object using regex
+    match = re.search(r"\{.*\}", response_text, re.DOTALL)
+    if match:
+        json_str = match.group(0)
+    else:
+        json_str = response_text  # fallback if not found
 
     try:
-        updated_faq = json.loads(response_text)
-        return updated_faq
+        return json.loads(json_str)
     except json.JSONDecodeError as e:
+        print("JSON decode error:", e)
+        print("Raw output was:\n", response)
         return {}
