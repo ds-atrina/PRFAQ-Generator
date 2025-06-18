@@ -13,3 +13,4 @@ langgraph
 mcp
 beautifulsoup4
 fastapi
+langchain-google-genai

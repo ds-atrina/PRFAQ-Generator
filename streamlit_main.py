@@ -12,6 +12,7 @@ import time
 import openai
 from utils.utils import extract_text_from_pdf, render_text_or_table_to_str, convert_to_json
 from langchain_openai import ChatOpenAI  
+from langchain_google_genai import ChatGoogleGenerativeAI
 from tools.qdrant_tool import kb_qdrant_tool
 from tools.web_search.web_search import WebTrustedSearchTool
 from graph import start_langgraph
@@ -65,7 +66,8 @@ def chat_with_llm(existing_faq, user_feedback, topic, problem, solution, chat_hi
     This function is optimized for performance and generalized for various conversational queries.
     """
     # Initialize LLM
-    llm = ChatOpenAI(model="o4-mini", temperature=1)  # Initialize LLM
+    #llm = ChatOpenAI(model="o4-mini", temperature=1)  # Initialize LLM
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",temperature=0.2)
 
     refine_prompt = f"""
         The user provided the following feedback:

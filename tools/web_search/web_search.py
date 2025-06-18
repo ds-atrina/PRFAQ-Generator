@@ -2,12 +2,14 @@ from typing import List, Dict, Any
 import requests
 import os
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from tools.web_search.whitelisted_sites import whitelisted_domain_list, onefinance_whitelisted_sites
 from dotenv import load_dotenv
 
 load_dotenv() 
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+#llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
 
 class WebTrustedSearchTool:
     def __init__(self, api_url=None):

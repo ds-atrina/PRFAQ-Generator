@@ -7,3 +7,5 @@ db/
 temp/
 ftenv/
 stvenv/
+tool_output/
+venv1/

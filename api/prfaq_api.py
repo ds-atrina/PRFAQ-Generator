@@ -1,7 +1,8 @@
 from fastapi import HTTPException, Header, Depends, APIRouter
 from pydantic import BaseModel
 from typing import Optional, List
-from langchain_openai import ChatOpenAI  
+from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from concurrent.futures import ThreadPoolExecutor
 from postgrest import APIError
 from fastapi.responses import StreamingResponse
@@ -291,7 +292,9 @@ async def modify_faq(
         problem_statement = space["details"].get("problemStatement", "")
 
         # Initialise LLM
-        llm = ChatOpenAI(model="o4-mini", temperature=1, openai_api_key=os.getenv("OPENAI_API_KEY"))
+        #llm = ChatOpenAI(model="o4-mini", temperature=1, openai_api_key=os.getenv("OPENAI_API_KEY"))
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
+
 
         # Refine the search query based on user feedback
         refine_prompt = f"""

@@ -3,6 +3,7 @@ import json
 import re
 import pandas as pd
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 def extract_text_from_pdf(pdf_file) -> str:
     """Extract text from a PDF file using PyMuPDF (fitz)."""
@@ -20,10 +21,17 @@ def remove_links(text):
     pattern = r'https?://\S+'
     return re.sub(pattern, '', text)
 
+# def get_openai_llm():
+#     return ChatOpenAI(
+#         model="o3-mini", 
+#         temperature=1, 
+#         timeout=120
+#     )
+
 def get_openai_llm():
-    return ChatOpenAI(
-        model="o3-mini", 
-        temperature=1, 
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", 
+        temperature=0.2, 
         timeout=120
     )
 

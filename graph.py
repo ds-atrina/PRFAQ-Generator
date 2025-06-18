@@ -8,6 +8,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 from prompts.prfaq import CONTENT_GENERATION_PROMPT, QUESTION_GENERATION_PROMPT, ANSWER_GENERATION_PROMPT
+from datetime import datetime
 
 # --- LangGraph Shared State ---
 State = Dict[str, Any]
@@ -178,12 +179,55 @@ def generate_questions_node(state: State, streaming_callback) -> State:
     stream_thinking_step(state, "generate_questions", "Questions generated.", streaming_callback)
     return {**state, "faq_questions": result}
 
+def save_tool_output(topic: str, problem: str, solution: str, results: list, internal_count: int) -> str:
+    # Create tool_output directory if it doesn't exist
+    output_dir = os.path.join(os.path.dirname(__file__), "tool_output")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Clean topic name for filename
+    safe_topic = "".join(x for x in topic if x.isalnum() or x in (' ', '-', '_')).strip()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{safe_topic}_{timestamp}.txt"
+    filepath = os.path.join(output_dir, filename)
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(f"Topic: {topic}\n")
+        f.write("="*50 + "\n\n")
+        f.write(f"Problem Statement:\n{problem}\n")
+        f.write("="*50 + "\n\n")
+        f.write(f"Solution:\n{solution}\n")
+        f.write("="*50 + "\n\n")
+        
+        # Internal Questions
+        f.write("INTERNAL QUESTIONS\n")
+        f.write("="*50 + "\n\n")
+        for result in results[:internal_count]:
+            f.write(f"Question: {result['question']}\n\n")
+            f.write("Knowledge Base Results:\n")
+            f.write(f"{result['kb_result']}\n\n")
+            if result['web_result']:
+                f.write("Web Search Results:\n")
+                f.write(f"{result['web_result']}\n")
+            f.write("-"*50 + "\n\n")
+            
+        # External Questions
+        f.write("EXTERNAL QUESTIONS\n")
+        f.write("="*50 + "\n\n")
+        for result in results[internal_count:]:
+            f.write(f"Question: {result['question']}\n\n")
+            f.write("Knowledge Base Results:\n")
+            f.write(f"{result['kb_result']}\n\n")
+            if result['web_result']:
+                f.write("Web Search Results:\n")
+                f.write(f"{result['web_result']}\n")
+            f.write("-"*50 + "\n\n")
+    
+    return filepath
 
 def answer_faq_node(state: State, streaming_callback) -> State:
     stream_thinking_step(state, "answer_faqs", "Answering all generated FAQs using all available information...", streaming_callback)
     llm = get_openai_llm()
     questions = state.get("faq_questions", {})
-    #print(f"---------------question list:{questions}")    
     generated_content = state.get("generated_content", {})
     topic = state.get("topic")
     problem = state.get("problem")
@@ -224,6 +268,7 @@ def answer_faq_node(state: State, streaming_callback) -> State:
             for q in internal_q
         ]
         internal_results = [future.result() for future in internal_futures]
+        print(f"Internallll result---{internal_results}")            ################
         
     # Process external_questions preserving order
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -232,6 +277,18 @@ def answer_faq_node(state: State, streaming_callback) -> State:
             for q in external_q
         ]
         external_results = [future.result() for future in external_futures]
+        print(f"Externallll result---{external_results}")                ####################
+
+     # Save results to file with internal question count
+    all_results = internal_results + external_results
+    output_file = save_tool_output(
+        topic=topic,
+        problem=problem,
+        solution=solution,
+        results=all_results,
+        internal_count=len(internal_results)  # Pass count of internal questions
+    )
+    print(f"\nTool output saved to: {output_file}")
 
     # Debug printing for processed questions
     for result in internal_results + external_results:
@@ -247,6 +304,7 @@ def answer_faq_node(state: State, streaming_callback) -> State:
     )
 
     response = llm.invoke(prompt)
+    print(f"FAQ RAW LLM--------------------{response.content}")               #################################
     response = convert_to_json(response.content)
     stream_thinking_step(state, "answer_faqs", "PRFAQ generated!", streaming_callback)
     
